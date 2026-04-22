@@ -47,4 +47,9 @@ app.*.map.json
 .env
 artefak.md
 spesifikasi.md
+<<<<<<< HEAD
 logbook-idham.md
+=======
+logbook-idham.md
+seeder.dart
+>>>>>>> origin/main
