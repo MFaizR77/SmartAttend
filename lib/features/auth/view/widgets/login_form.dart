@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 class LoginForm extends StatefulWidget {
   final bool isLoading;
   final String? errorMessage;
-  final void Function(String email, String password) onLogin;
+  final void Function(String identifier, String password) onLogin;
 
   const LoginForm({
     super.key,
@@ -20,13 +20,13 @@ class LoginForm extends StatefulWidget {
 
 class _LoginFormState extends State<LoginForm> {
   final _formKey = GlobalKey<FormState>();
-  final _emailController = TextEditingController();
+  final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
 
   @override
   void dispose() {
-    _emailController.dispose();
+    _identifierController.dispose();
     _passwordController.dispose();
     super.dispose();
   }
@@ -34,7 +34,7 @@ class _LoginFormState extends State<LoginForm> {
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
     widget.onLogin(
-      _emailController.text,
+      _identifierController.text,
       _passwordController.text,
     );
   }
@@ -46,22 +46,19 @@ class _LoginFormState extends State<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Email
+          // Identifier (NIM/ID)
           TextFormField(
-            controller: _emailController,
-            keyboardType: TextInputType.emailAddress,
+            controller: _identifierController,
+            keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
-              labelText: 'Email',
-              hintText: 'contoh@smartattend.com',
-              prefixIcon: Icon(Icons.email_outlined),
+              labelText: 'NIM / ID Pengguna',
+              hintText: 'Contoh: 241511033',
+              prefixIcon: Icon(Icons.person_outline),
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'Email tidak boleh kosong';
-              }
-              if (!value.contains('@')) {
-                return 'Format email tidak valid';
+                return 'NIM / ID tidak boleh kosong';
               }
               return null;
             },

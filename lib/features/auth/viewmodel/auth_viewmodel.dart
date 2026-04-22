@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 import '../../../data/local/models/user.dart';
-import '../../../data/local/dummy_data.dart';
-
+import '../../../data/remote/database_service.dart';
 /// ViewModel untuk autentikasi.
 /// Mencocokkan email+password ke dummy data, role otomatis dari data.
 class AuthViewModel {
@@ -11,13 +10,13 @@ class AuthViewModel {
 
   /// Login dengan email dan password.
   /// Mencocokkan ke [DummyData.users], role ditentukan otomatis.
-  Future<void> login(String email, String password) async {
+  Future<void> login(String identifier, String password) async {
     // Reset error
     errorMessage.value = null;
 
     // Validasi input
-    if (email.trim().isEmpty) {
-      errorMessage.value = 'Email tidak boleh kosong';
+    if (identifier.trim().isEmpty) {
+      errorMessage.value = 'NIM/ID tidak boleh kosong';
       return;
     }
     if (password.isEmpty) {
@@ -27,22 +26,33 @@ class AuthViewModel {
 
     isLoading.value = true;
 
-    // Simulasi delay jaringan
-    await Future.delayed(const Duration(milliseconds: 800));
+    try {
+      final dbUser = await DatabaseService().login(identifier.trim(), password);
 
-    // Cari user yang cocok
-    final matchedUser = DummyData.users.where(
-      (u) => u.email == email.trim().toLowerCase() && u.passwordHash == password,
-    );
+      if (dbUser != null) {
+        UserRole mappedRole = UserRole.mahasiswa;
+        if (dbUser['role'] == 'dosen') mappedRole = UserRole.dosen;
+        if (dbUser['role'] == 'admin') mappedRole = UserRole.admin;
 
-    if (matchedUser.isNotEmpty) {
-      currentUser.value = matchedUser.first;
-      errorMessage.value = null;
-    } else {
-      errorMessage.value = 'Email atau password salah';
+        currentUser.value = User(
+          id: dbUser['_id']?.toString() ?? '',
+          nama: dbUser['nama'] ?? 'Unknown',
+          email: dbUser['email'] ?? '',
+          role: mappedRole,
+          passwordHash: dbUser['passwordHash'] ?? '',
+          createdAt: dbUser['createdAt'] != null 
+              ? DateTime.tryParse(dbUser['createdAt'].toString()) ?? DateTime.now()
+              : DateTime.now(),
+        );
+        errorMessage.value = null;
+      } else {
+        errorMessage.value = 'NIM/ID atau password salah';
+      }
+    } catch (e) {
+      errorMessage.value = 'Gagal terhubung ke server: $e';
+    } finally {
+      isLoading.value = false;
     }
-
-    isLoading.value = false;
   }
 
   /// Logout — reset semua state.

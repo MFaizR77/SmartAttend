@@ -4,9 +4,13 @@ import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
 
-void main() {
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: ".env");
   runApp(const SmartAttendApp());
 }
 

@@ -99,7 +99,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          'Masukkan email dan password untuk melanjutkan',
+                          'Masukkan NIM/ID dan password untuk melanjutkan',
                           style: Theme.of(context).textTheme.bodySmall?.copyWith(
                             color: const Color(0xFF6B7280),
                           ),
@@ -116,8 +116,8 @@ class _LoginScreenState extends State<LoginScreen> {
                                 return LoginForm(
                                   isLoading: isLoading,
                                   errorMessage: errorMsg,
-                                  onLogin: (email, password) {
-                                    _vm.login(email, password);
+                                  onLogin: (identifier, password) {
+                                    _vm.login(identifier, password);
                                   },
                                 );
                               },
@@ -155,11 +155,10 @@ class _LoginScreenState extends State<LoginScreen> {
                         ],
                       ),
                       const SizedBox(height: 8),
-                      const Text(
-                        'mahasiswa@smartattend.com\n'
-                        'dosen@smartattend.com\n'
-                        'admin@smartattend.com\n'
-                        'Password: 123456',
+                        const Text(
+                        'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
+                        'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
+                        'Gunakan sesuai data di database.',
                         style: TextStyle(fontSize: 12, color: Color(0xFF1E1E2C), height: 1.6),
                       ),
                     ],
