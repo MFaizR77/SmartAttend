@@ -20,7 +20,8 @@ class AuthViewModel {
       if (expiryDate != null && DateTime.now().isBefore(expiryDate)) {
         // Sesi valid
         try {
-          currentUser.value = User.fromMap(userData as Map<dynamic, dynamic>);
+          final typedMap = Map<String, dynamic>.from(userData as Map);
+          currentUser.value = User.fromMap(typedMap);
           return true;
         } catch (e) {
           print('Error parsing offline user: $e');

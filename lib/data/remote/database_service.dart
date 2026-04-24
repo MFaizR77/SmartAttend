@@ -7,8 +7,14 @@ class DatabaseService {
   DatabaseService._internal();
 
   Db? _db;
+  bool _isConnecting = false;
 
   Future<void> connect() async {
+    // Tunggu jika sedang ada proses koneksi lain yang berjalan
+    while (_isConnecting) {
+      await Future.delayed(const Duration(milliseconds: 100));
+    }
+
     if (_db != null) {
       if (_db!.isConnected) {
         // Coba ping untuk memastikan socket tidak mati
@@ -22,15 +28,20 @@ class DatabaseService {
     
     if (_db != null && _db!.isConnected) return;
     
-    // Ambil MONGODB_URI
-    final mongoUri = dotenv.env['MONGODB_URI'];
-    if (mongoUri == null || mongoUri.isEmpty) {
-      throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
-    }
+    _isConnecting = true;
+    try {
+      // Ambil MONGODB_URI
+      final mongoUri = dotenv.env['MONGODB_URI'];
+      if (mongoUri == null || mongoUri.isEmpty) {
+        throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
+      }
 
-    _db = await Db.create(mongoUri);
-    await _db!.open();
-    print('✅ Berhasil terhubung ke MongoDB');
+      _db = await Db.create(mongoUri);
+      await _db!.open(secure: true, tlsAllowInvalidCertificates: true);
+      print('✅ Berhasil terhubung ke MongoDB');
+    } finally {
+      _isConnecting = false;
+    }
   }
 
   Future<Map<String, dynamic>?> login(String identifier, String password) async {
@@ -138,6 +149,28 @@ class DatabaseService {
     }
     
     await collection.insertOne(record);
+  }
+
+  /// Mengecek apakah mahasiswa sudah presensi untuk sesi/jadwal tersebut hari ini
+  Future<bool> checkPresensiExists(String sesiId, String mahasiswaId) async {
+    await connect();
+    final collection = _db!.collection('record_presensi');
+    
+    // Gunakan batasan waktu hari ini untuk mengecek
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final record = await collection.findOne({
+      'sesiId': sesiId,
+      'mahasiswaId': mahasiswaId,
+      'timestamp': {
+        '\$gte': startOfDay.toIso8601String(),
+        '\$lte': endOfDay.toIso8601String(),
+      }
+    });
+
+    return record != null;
   }
 
   /// Menutup koneksi database

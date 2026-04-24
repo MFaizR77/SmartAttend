@@ -22,6 +22,15 @@ class _PresensiScreenState extends State<PresensiScreen> {
   final _vm = PresensiViewModel();
 
   @override
+  void initState() {
+    super.initState();
+    final jadwalId = widget.jadwal['id'] ?? '';
+    if (jadwalId.isNotEmpty) {
+      _vm.checkInitialStatus(jadwalId, widget.user);
+    }
+  }
+
+  @override
   void dispose() {
     _vm.dispose();
     super.dispose();

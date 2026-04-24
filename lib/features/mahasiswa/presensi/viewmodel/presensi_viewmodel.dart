@@ -12,6 +12,44 @@ class PresensiViewModel {
   final ValueNotifier<String?> errorMessage = ValueNotifier(null);
   final ValueNotifier<bool> isOfflineMode = ValueNotifier(false);
 
+  Future<void> checkInitialStatus(String jadwalId, User user) async {
+    isLoading.value = true;
+    try {
+      // 1. Cek dari lokal (Hive) dulu
+      final presensiBox = HiveHelper.recordPresensiBoxInstance;
+      final localRecords = presensiBox.values.where((r) => 
+        r.sesiId == jadwalId && 
+        r.mahasiswaId == user.id &&
+        r.timestamp.day == DateTime.now().day &&
+        r.timestamp.month == DateTime.now().month &&
+        r.timestamp.year == DateTime.now().year
+      ).toList();
+
+      if (localRecords.isNotEmpty) {
+        isHadir.value = true;
+        isOfflineMode.value = localRecords.first.syncStatus != 'synced';
+        isLoading.value = false;
+        return;
+      }
+
+      // 2. Jika tidak ada di lokal, cek online (ke MongoDB)
+      final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
+      final isOnline = connectivityResult.isNotEmpty && !connectivityResult.contains(ConnectivityResult.none);
+      
+      if (isOnline) {
+        final exists = await DatabaseService().checkPresensiExists(jadwalId, user.id);
+        if (exists) {
+          isHadir.value = true;
+          isOfflineMode.value = false;
+        }
+      }
+    } catch (e) {
+      print('Error checking initial presensi status: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
+
   Future<void> doCheckIn(String jadwalId, User user) async {
     isLoading.value = true;
     errorMessage.value = null;

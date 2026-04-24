@@ -9,12 +9,16 @@ import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
 import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/services/sync_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
+  
+  // Inisialisasi proses sinkronisasi background
+  SyncManager().init();
   
   final authViewModel = AuthViewModel();
   await authViewModel.checkOfflineSession();
