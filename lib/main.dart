@@ -4,8 +4,9 @@ import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:dotenv/dotenv.dart' as dotenv_pkg;
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
+<<<<<<< Updated upstream
 import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
 import 'package:intl/date_symbol_data_local.dart';
@@ -20,6 +21,15 @@ Future<void> main() async {
   await authViewModel.checkOfflineSession();
 
   runApp(SmartAttendApp(authViewModel: authViewModel));
+=======
+import 'features/onboarding/view/onboarding_screen.dart';
+
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  dotenv_pkg.DotEnv(includePlatformEnvironment: true).load(['.env']);
+  runApp(const SmartAttendApp());
+>>>>>>> Stashed changes
 }
 
 /// Root widget aplikasi SmartAttend.
@@ -69,9 +79,18 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
       title: 'SmartAttend',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
+<<<<<<< Updated upstream
       initialRoute: initialRoute,
+=======
+      initialRoute: '/onboarding',
+>>>>>>> Stashed changes
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/onboarding':
+            return MaterialPageRoute(
+              builder: (_) => const OnboardingScreen(),
+            );
+
           case '/login':
             return MaterialPageRoute(
               builder: (_) => LoginScreen(authViewModel: _authViewModel),
