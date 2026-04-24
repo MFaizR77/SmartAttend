@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
+import '../../presensi/view/presensi_screen.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan jadwal hari ini, statistik kehadiran, dan menu cepat.
@@ -27,7 +28,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _vm.loadData();
+    _vm.loadData(widget.user);
   }
 
   @override
@@ -247,6 +248,17 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Widget _buildJadwalCard(Map<String, String> jadwal) {
     return Card(
       child: ListTile(
+        onTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PresensiScreen(
+                jadwal: jadwal,
+                user: widget.user,
+              ),
+            ),
+          );
+        },
         leading: Container(
           width: 40,
           height: 40,
