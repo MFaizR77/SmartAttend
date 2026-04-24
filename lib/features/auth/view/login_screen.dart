@@ -54,119 +54,141 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: const Color(0xFFF8F9FA),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                // Logo & nama app
-                const Icon(
-                  Icons.school_rounded,
-                  size: 64,
-                  color: Color(0xFF3B82F6),
-                ),
-                const SizedBox(height: 12),
-                Text(
-                  'SmartAttend',
-                  style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Sistem Presensi Mahasiswa',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: const Color(0xFF6B7280),
-                  ),
-                ),
-
-                const SizedBox(height: 40),
-
-                // Form login dalam card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(24),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Masuk',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Masukkan NIM/ID dan password untuk melanjutkan',
-                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: const Color(0xFF6B7280),
-                          ),
-                        ),
-                        const SizedBox(height: 24),
-
-                        // Form — listen loading & error dari ViewModel
-                        ValueListenableBuilder<bool>(
-                          valueListenable: _vm.isLoading,
-                          builder: (context, isLoading, _) {
-                            return ValueListenableBuilder<String?>(
-                              valueListenable: _vm.errorMessage,
-                              builder: (context, errorMsg, _) {
-                                return LoginForm(
-                                  isLoading: isLoading,
-                                  errorMessage: errorMsg,
-                                  onLogin: (identifier, password) {
-                                    _vm.login(identifier, password);
-                                  },
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 24),
-
-                // Info akun testing (hapus di production)
-                Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFDBEAFE),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 72),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 448),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                spacing: 32,
+                children: [
+                  // ── Header: SMARTATTEND + subtitle ──
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    spacing: 8,
                     children: [
-                      Row(
-                        children: [
-                          const Icon(Icons.info_outline, size: 16, color: Color(0xFF3B82F6)),
-                          const SizedBox(width: 6),
-                          Text(
-                            'Akun Testing',
-                            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                              fontWeight: FontWeight.w600,
-                              color: const Color(0xFF3B82F6),
+                      Text.rich(
+                        TextSpan(
+                          children: [
+                            TextSpan(
+                              text: 'SMART',
+                              style: TextStyle(
+                                color: const Color(0xFFD4FF00),
+                                fontSize: 40,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w700,
+                                height: 1.20,
+                                letterSpacing: -1.20,
+                              ),
                             ),
-                          ),
-                        ],
+                            TextSpan(
+                              text: 'ATTEND',
+                              style: TextStyle(
+                                color: const Color(0xFF1A1A1A),
+                                fontSize: 40,
+                                fontFamily: 'Inter',
+                                fontWeight: FontWeight.w700,
+                                height: 1.20,
+                                letterSpacing: -1.20,
+                              ),
+                            ),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      const SizedBox(height: 8),
-                        const Text(
-                        'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
-                        'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
-                        'Gunakan sesuai data di database.',
-                        style: TextStyle(fontSize: 12, color: Color(0xFF1E1E2C), height: 1.6),
+                      const Text(
+                        'Selamat Datang!!',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF4A4A4A),
+                          fontSize: 18,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontWeight: FontWeight.w400,
+                          height: 1.56,
+                        ),
                       ),
                     ],
                   ),
-                ),
 
-                const SizedBox(height: 24),
-              ],
+                  // ── Card form login ──
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.only(
+                      top: 40,
+                      left: 32,
+                      right: 32,
+                      bottom: 32,
+                    ),
+                    decoration: ShapeDecoration(
+                      color: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        side: const BorderSide(
+                          width: 2,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      shadows: const [
+                        BoxShadow(
+                          color: Color(0xFF1A1A1A),
+                          blurRadius: 0,
+                          offset: Offset(4, 4),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: ValueListenableBuilder<bool>(
+                      valueListenable: _vm.isLoading,
+                      builder: (context, isLoading, _) {
+                        return ValueListenableBuilder<String?>(
+                          valueListenable: _vm.errorMessage,
+                          builder: (context, errorMsg, _) {
+                            return LoginForm(
+                              isLoading: isLoading,
+                              errorMessage: errorMsg,
+                              onLogin: (identifier, password) {
+                                _vm.login(identifier, password);
+                              },
+                            );
+                          },
+                        );
+                      },
+                    ),
+                  ),
+
+                  // ── Info box akun testing (hapus di production) ──
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(16),
+                    decoration: ShapeDecoration(
+                      color: const Color(0xFFD6E3FF),
+                      shape: RoundedRectangleBorder(
+                        side: const BorderSide(
+                          width: 2,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                    ),
+                    child: const Text(
+                      'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
+                      'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
+                      'Gunakan sesuai data di database.',
+                      style: TextStyle(
+                        color: Color(0xFF0055FF),
+                        fontSize: 10,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w400,
+                        height: 1.25,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             ),
           ),
         ),
