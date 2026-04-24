@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../../../data/local/models/user.dart';
 import '../../../data/remote/database_service.dart';
@@ -12,16 +13,23 @@ class AuthViewModel {
   /// Cek sesi offline saat aplikasi dibuka
   Future<bool> checkOfflineSession() async {
     final userBox = HiveHelper.userBoxInstance;
-    final userData = userBox.get('currentUser');
+    final userDataStr = userBox.get('currentUser');
     final expiryStr = userBox.get('expiryDate');
 
-    if (userData != null && expiryStr != null) {
+    if (userDataStr != null && expiryStr != null) {
       final expiryDate = DateTime.tryParse(expiryStr.toString());
       if (expiryDate != null && DateTime.now().isBefore(expiryDate)) {
         // Sesi valid
         try {
-          final typedMap = Map<String, dynamic>.from(userData as Map);
-          currentUser.value = User.fromMap(typedMap);
+          // Decode JSON string back to Map<String, dynamic>
+          Map<String, dynamic> userMap;
+          if (userDataStr is String) {
+            userMap = jsonDecode(userDataStr);
+          } else {
+            userMap = Map<String, dynamic>.from(userDataStr as Map);
+          }
+          
+          currentUser.value = User.fromMap(userMap);
           return true;
         } catch (e) {
           print('Error parsing offline user: $e');
@@ -65,16 +73,16 @@ class AuthViewModel {
           nama: dbUser['nama'] ?? 'Unknown',
           email: dbUser['email'] ?? '',
           role: mappedRole,
-          passwordHash: dbUser['passwordHash'] ?? '',
+          passwordHash: password, // Simpan password plain yang diketik agar bisa dicek saat offline
           createdAt: dbUser['createdAt'] != null 
               ? DateTime.tryParse(dbUser['createdAt'].toString()) ?? DateTime.now()
               : DateTime.now(),
-          kelas: dbUser['kelas'], // Menambahkan mapping kelas
+          kelas: dbUser['kelas'],
         );
 
         // Simpan sesi ke Hive (Offline First)
         final userBox = HiveHelper.userBoxInstance;
-        await userBox.put('currentUser', user.toMap());
+        await userBox.put('currentUser', jsonEncode(user.toMap()));
         await userBox.put('expiryDate', DateTime.now().add(const Duration(days: 1)).toIso8601String());
 
         currentUser.value = user;
@@ -83,7 +91,52 @@ class AuthViewModel {
         errorMessage.value = 'NIM/ID atau password salah';
       }
     } catch (e) {
-      errorMessage.value = 'Gagal terhubung ke server: $e';
+      // Jika gagal connect ke server (offline), coba validasi dengan data lokal di Hive
+      final isNetworkError = e.toString().contains('SocketException') || 
+                             e.toString().contains('ConnectionException') ||
+                             e.toString().contains('HandshakeException');
+      
+      if (isNetworkError) {
+        final userBox = HiveHelper.userBoxInstance;
+        final userDataStr = userBox.get('currentUser');
+        final expiryStr = userBox.get('expiryDate');
+
+        if (userDataStr != null && expiryStr != null) {
+          try {
+            Map<String, dynamic> userMap;
+            if (userDataStr is String) {
+              userMap = jsonDecode(userDataStr);
+            } else {
+              userMap = Map<String, dynamic>.from(userDataStr as Map);
+            }
+            final localUser = User.fromMap(userMap);
+            
+            // Pengecekan kredensial lokal
+            final isIdentifierMatch = localUser.id == identifier.trim() || localUser.email == identifier.trim();
+            final isPasswordMatch = localUser.passwordHash == password; // asumsikan passwordHash di lokal nyimpan password / hash yg sama
+
+            if (isIdentifierMatch && isPasswordMatch) {
+              final expiryDate = DateTime.tryParse(expiryStr.toString());
+              if (expiryDate != null && DateTime.now().isBefore(expiryDate)) {
+                currentUser.value = localUser;
+                errorMessage.value = null;
+                isLoading.value = false;
+                return; // Sukses login offline
+              } else {
+                errorMessage.value = 'Sesi offline telah kadaluarsa (lebih dari 1 hari). Anda harus online.';
+              }
+            } else {
+              errorMessage.value = 'NIM/ID atau password salah (Mode Offline)';
+            }
+          } catch (offlineErr) {
+            errorMessage.value = 'Gagal membaca sesi offline: $offlineErr';
+          }
+        } else {
+          errorMessage.value = 'Anda sedang offline dan belum pernah login sebelumnya di perangkat ini.';
+        }
+      } else {
+        errorMessage.value = 'Terjadi kesalahan: $e';
+      }
     } finally {
       isLoading.value = false;
     }
