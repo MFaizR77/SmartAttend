@@ -24,7 +24,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _vm.loadData();
+    _vm.loadData(widget.user);
   }
 
   @override
