@@ -26,6 +26,7 @@ class MahasiswaDashboardViewModel {
       
       final mappedJadwal = jadwalDB.map((doc) {
         return {
+          'id': doc['_id']?.toString() ?? '',
           'mataKuliah': '${doc['namaMK']} (${doc['tipe']})',
           'jam': '${doc['jamMulai']} - ${doc['jamSelesai']}',
           'ruang': doc['ruangan']?.toString() ?? '-',

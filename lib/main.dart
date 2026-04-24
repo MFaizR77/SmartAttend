@@ -6,24 +6,39 @@ import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
-
+import 'data/local/hive_helper.dart';
+import 'data/local/models/user.dart';
+import 'package:intl/date_symbol_data_local.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: ".env");
-  runApp(const SmartAttendApp());
+  await HiveHelper.init();
+  await initializeDateFormatting('id_ID', null);
+  
+  final authViewModel = AuthViewModel();
+  await authViewModel.checkOfflineSession();
+
+  runApp(SmartAttendApp(authViewModel: authViewModel));
 }
 
 /// Root widget aplikasi SmartAttend.
 class SmartAttendApp extends StatefulWidget {
-  const SmartAttendApp({super.key});
+  final AuthViewModel authViewModel;
+  const SmartAttendApp({super.key, required this.authViewModel});
 
   @override
   State<SmartAttendApp> createState() => _SmartAttendAppState();
 }
 
 class _SmartAttendAppState extends State<SmartAttendApp> {
-  final _authViewModel = AuthViewModel();
+  late AuthViewModel _authViewModel;
+
+  @override
+  void initState() {
+    super.initState();
+    _authViewModel = widget.authViewModel;
+  }
 
   @override
   void dispose() {
@@ -32,18 +47,29 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
   }
 
   /// Logout — reset state dan kembali ke login.
-  void _handleLogout(BuildContext context) {
-    _authViewModel.logout();
-    Navigator.of(context).pushReplacementNamed('/login');
+  void _handleLogout(BuildContext context) async {
+    await _authViewModel.logout();
+    if (context.mounted) {
+      Navigator.of(context).pushReplacementNamed('/login');
+    }
   }
 
   @override
   Widget build(BuildContext context) {
+    final currentUser = _authViewModel.currentUser.value;
+    String initialRoute = '/login';
+    
+    if (currentUser != null) {
+      if (currentUser.role == UserRole.mahasiswa) initialRoute = '/mahasiswa';
+      else if (currentUser.role == UserRole.dosen) initialRoute = '/dosen';
+      else if (currentUser.role == UserRole.admin) initialRoute = '/admin';
+    }
+
     return MaterialApp(
       title: 'SmartAttend',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      initialRoute: '/login',
+      initialRoute: initialRoute,
       onGenerateRoute: (settings) {
         switch (settings.name) {
           case '/login':

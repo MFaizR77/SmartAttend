@@ -33,4 +33,33 @@ class User {
         return 'Admin';
     }
   }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'id': id,
+      'nama': nama,
+      'email': email,
+      'role': role.name,
+      'passwordHash': passwordHash,
+      'createdAt': createdAt.toIso8601String(),
+      'kelas': kelas,
+    };
+  }
+
+  factory User.fromMap(Map<dynamic, dynamic> map) {
+    return User(
+      id: map['id'] ?? '',
+      nama: map['nama'] ?? '',
+      email: map['email'] ?? '',
+      role: UserRole.values.firstWhere(
+        (e) => e.name == map['role'],
+        orElse: () => UserRole.mahasiswa,
+      ),
+      passwordHash: map['passwordHash'] ?? '',
+      createdAt: map['createdAt'] != null 
+          ? DateTime.parse(map['createdAt']) 
+          : DateTime.now(),
+      kelas: map['kelas'],
+    );
+  }
 }

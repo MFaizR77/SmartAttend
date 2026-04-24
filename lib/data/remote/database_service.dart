@@ -127,6 +127,19 @@ class DatabaseService {
     }
   }
 
+  /// Menyimpan data presensi langsung ke MongoDB (ketika online)
+  Future<void> insertRecordPresensi(Map<String, dynamic> record) async {
+    await connect();
+    final collection = _db!.collection('record_presensi');
+    
+    // Pastikan _id digenerate jika tidak ada
+    if (!record.containsKey('_id')) {
+      record['_id'] = ObjectId();
+    }
+    
+    await collection.insertOne(record);
+  }
+
   /// Menutup koneksi database
   Future<void> close() async {
     if (_db != null) {
