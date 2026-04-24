@@ -32,11 +32,11 @@ dependencies:
     sdk: flutter
 <<<<<<< HEAD
 =======
-  
+
   hive: ^2.2.3
   hive_flutter: ^1.1.0
   mongo_dart: ^0.9.0
-  dotenv: ^4.2.0  
+  dotenv: ^4.2.0
 >>>>>>> origin/main
 
   # The following adds the Cupertino Icons font to your application.
