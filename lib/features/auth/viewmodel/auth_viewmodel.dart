@@ -35,7 +35,7 @@ class AuthViewModel {
         if (dbUser['role'] == 'admin') mappedRole = UserRole.admin;
 
         currentUser.value = User(
-          id: dbUser['_id']?.toString() ?? '',
+          id: dbUser['nim']?.toString() ?? dbUser['kode']?.toString() ?? dbUser['_id']?.toString() ?? '',
           nama: dbUser['nama'] ?? 'Unknown',
           email: dbUser['email'] ?? '',
           role: mappedRole,
@@ -43,6 +43,7 @@ class AuthViewModel {
           createdAt: dbUser['createdAt'] != null 
               ? DateTime.tryParse(dbUser['createdAt'].toString()) ?? DateTime.now()
               : DateTime.now(),
+          kelas: dbUser['kelas'], // Menambahkan mapping kelas
         );
         errorMessage.value = null;
       } else {
@@ -60,6 +61,7 @@ class AuthViewModel {
     currentUser.value = null;
     errorMessage.value = null;
     isLoading.value = false;
+    DatabaseService().close();
   }
 
   /// Bersihkan resource.

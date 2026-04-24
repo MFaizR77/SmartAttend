@@ -10,6 +10,7 @@ class User {
   final UserRole role;
   final String passwordHash; // plain text untuk dummy
   final DateTime createdAt;
+  final String? kelas;
 
   const User({
     required this.id,
@@ -18,6 +19,7 @@ class User {
     required this.role,
     required this.passwordHash,
     required this.createdAt,
+    this.kelas,
   });
 
   /// Label role yang mudah dibaca (untuk ditampilkan di UI).

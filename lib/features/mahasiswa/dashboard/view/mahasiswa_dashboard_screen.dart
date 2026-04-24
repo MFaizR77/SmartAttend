@@ -27,7 +27,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   @override
   void initState() {
     super.initState();
-    _vm.loadData();
+    _vm.loadData(widget.user);
   }
 
   @override
