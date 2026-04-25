@@ -159,6 +159,7 @@ class _LoginFormState extends State<LoginForm> {
             },
           ),
 
+          const SizedBox(height: 16),
           // ── Pesan error ───────────────────────────────────────────
           if (widget.errorMessage != null) ...[
             Container(
