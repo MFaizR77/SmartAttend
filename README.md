@@ -2,8 +2,6 @@
 
 Proyek flutter tentang absensi dosen dan mahasiswa berbasis offline-first 
 
-<<<<<<< HEAD
-=======
 ## Struktur Folder
 
 ```
@@ -92,4 +90,3 @@ lib/
             └── viewmodel/
                 └── rekap_viewmodel.dart
 ```
->>>>>>> origin/main
