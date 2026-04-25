@@ -4,16 +4,17 @@ import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
+import 'features/onboarding/view/onboarding_screen.dart';
 import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/services/sync_manager.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await dotenv.load(fileName: ".env");
+  await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
   
@@ -21,15 +22,43 @@ Future<void> main() async {
   SyncManager().init();
   
   final authViewModel = AuthViewModel();
-  await authViewModel.checkOfflineSession();
+  final hasSession = await authViewModel.checkOfflineSession();
 
-  runApp(SmartAttendApp(authViewModel: authViewModel));
+  // Tentukan initialRoute SEBELUM runApp — bukan di dalam build().
+  // MaterialApp hanya membaca initialRoute sekali saat pertama dibuat.
+  String initialRoute;
+  if (hasSession && authViewModel.currentUser.value != null) {
+    final role = authViewModel.currentUser.value!.role;
+    if (role == UserRole.mahasiswa) {
+      initialRoute = '/mahasiswa';
+    } else if (role == UserRole.dosen) {
+      initialRoute = '/dosen';
+    } else if (role == UserRole.admin) {
+      initialRoute = '/admin';
+    } else {
+      initialRoute = '/login';
+    }
+  } else {
+    // Belum login → tampilkan onboarding
+    initialRoute = '/onboarding';
+  }
+
+  runApp(SmartAttendApp(
+    authViewModel: authViewModel,
+    initialRoute: initialRoute,
+  ));
 }
 
 /// Root widget aplikasi SmartAttend.
 class SmartAttendApp extends StatefulWidget {
   final AuthViewModel authViewModel;
-  const SmartAttendApp({super.key, required this.authViewModel});
+  final String initialRoute;
+
+  const SmartAttendApp({
+    super.key,
+    required this.authViewModel,
+    required this.initialRoute,
+  });
 
   @override
   State<SmartAttendApp> createState() => _SmartAttendAppState();
@@ -60,22 +89,18 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
 
   @override
   Widget build(BuildContext context) {
-    final currentUser = _authViewModel.currentUser.value;
-    String initialRoute = '/login';
-    
-    if (currentUser != null) {
-      if (currentUser.role == UserRole.mahasiswa) initialRoute = '/mahasiswa';
-      else if (currentUser.role == UserRole.dosen) initialRoute = '/dosen';
-      else if (currentUser.role == UserRole.admin) initialRoute = '/admin';
-    }
-
     return MaterialApp(
       title: 'SmartAttend',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.light,
-      initialRoute: initialRoute,
+      initialRoute: widget.initialRoute,
       onGenerateRoute: (settings) {
         switch (settings.name) {
+          case '/onboarding':
+            return MaterialPageRoute(
+              builder: (_) => const OnboardingScreen(),
+            );
+
           case '/login':
             return MaterialPageRoute(
               builder: (_) => LoginScreen(authViewModel: _authViewModel),

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-/// Form login reusable.
+/// Form login reusable dengan desain baru (retro style).
 /// Hanya UI — logika login dipanggil via callback [onLogin].
 class LoginForm extends StatefulWidget {
   final bool isLoading;
@@ -33,59 +33,123 @@ class _LoginFormState extends State<LoginForm> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    widget.onLogin(
-      _identifierController.text,
-      _passwordController.text,
-    );
+    widget.onLogin(_identifierController.text.trim(), _passwordController.text);
   }
+
+  // ── Shared border decoration ──────────────────────────────────────
+  OutlineInputBorder _border({Color color = const Color(0xFF1A1A1A)}) =>
+      OutlineInputBorder(
+        borderRadius: BorderRadius.circular(4),
+        borderSide: BorderSide(width: 2, color: color),
+      );
+
+  // ── Shared label style ────────────────────────────────────────────
+  static const TextStyle _labelStyle = TextStyle(
+    color: Color(0xFF1A1A1A),
+    fontSize: 12,
+    fontFamily: 'Plus Jakarta Sans',
+    fontWeight: FontWeight.w400,
+    height: 1.33,
+    letterSpacing: 1.20,
+  );
+
+  // ── Shared hint / input style ─────────────────────────────────────
+  static const TextStyle _hintStyle = TextStyle(
+    color: Color(0xFF6B7280),
+    fontSize: 16,
+    fontFamily: 'Plus Jakarta Sans',
+    fontWeight: FontWeight.w400,
+  );
+
+  static const TextStyle _inputStyle = TextStyle(
+    color: Color(0xFF1A1A1A),
+    fontSize: 16,
+    fontFamily: 'Plus Jakarta Sans',
+    fontWeight: FontWeight.w400,
+  );
 
   @override
   Widget build(BuildContext context) {
     return Form(
       key: _formKey,
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Identifier (NIM/ID)
+          // ── USERNAME ─────────────────────────────────────────────
+          const Text('USERNAME', style: _labelStyle),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _identifierController,
             keyboardType: TextInputType.text,
             textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: 'NIM / ID Pengguna',
-              hintText: 'Contoh: 241511033',
-              prefixIcon: Icon(Icons.person_outline),
+            style: _inputStyle,
+            decoration: InputDecoration(
+              hintText: 'Masukkan username',
+              hintStyle: _hintStyle,
+              prefixIcon: const Icon(
+                Icons.person_outline,
+                color: Color(0xFF1A1A1A),
+                size: 20,
+              ),
+              filled: true,
+              fillColor: const Color(0xFFF5F0E8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              enabledBorder: _border(),
+              focusedBorder: _border(),
+              errorBorder: _border(color: Colors.red),
+              focusedErrorBorder: _border(color: Colors.red),
             ),
             validator: (value) {
               if (value == null || value.trim().isEmpty) {
-                return 'NIM / ID tidak boleh kosong';
+                return 'Username tidak boleh kosong';
               }
               return null;
             },
           ),
 
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
 
-          // Password
+          // ── PASSWORD ─────────────────────────────────────────────
+          const Text('PASSWORD', style: _labelStyle),
+          const SizedBox(height: 8),
           TextFormField(
             controller: _passwordController,
             obscureText: _obscurePassword,
             textInputAction: TextInputAction.done,
             onFieldSubmitted: (_) => _submit(),
+            style: _inputStyle,
             decoration: InputDecoration(
-              labelText: 'Password',
               hintText: 'Masukkan password',
-              prefixIcon: const Icon(Icons.lock_outline),
+              hintStyle: _hintStyle,
+              prefixIcon: const Icon(
+                Icons.lock_outline,
+                color: Color(0xFF1A1A1A),
+                size: 20,
+              ),
               suffixIcon: IconButton(
                 icon: Icon(
                   _obscurePassword
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
+                  color: const Color(0xFF1A1A1A),
+                  size: 20,
                 ),
-                onPressed: () {
-                  setState(() => _obscurePassword = !_obscurePassword);
-                },
+                onPressed: () =>
+                    setState(() => _obscurePassword = !_obscurePassword),
               ),
+              filled: true,
+              fillColor: const Color(0xFFF5F0E8),
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 14,
+              ),
+              enabledBorder: _border(),
+              focusedBorder: _border(),
+              errorBorder: _border(color: Colors.red),
+              focusedErrorBorder: _border(color: Colors.red),
             ),
             validator: (value) {
               if (value == null || value.isEmpty) {
@@ -95,30 +159,27 @@ class _LoginFormState extends State<LoginForm> {
             },
           ),
 
-          const SizedBox(height: 24),
-
-          // Error message
+          // ── Pesan error ───────────────────────────────────────────
           if (widget.errorMessage != null) ...[
             Container(
-              padding: const EdgeInsets.all(12),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
               decoration: BoxDecoration(
-                color: Theme.of(context).colorScheme.error.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
+                color: Colors.red.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(4),
+                border: Border.all(color: Colors.red, width: 1.5),
               ),
               child: Row(
                 children: [
-                  Icon(
-                    Icons.error_outline,
-                    color: Theme.of(context).colorScheme.error,
-                    size: 20,
-                  ),
+                  const Icon(Icons.error_outline, color: Colors.red, size: 18),
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
                       widget.errorMessage!,
-                      style: TextStyle(
-                        color: Theme.of(context).colorScheme.error,
-                        fontSize: 14,
+                      style: const TextStyle(
+                        color: Colors.red,
+                        fontSize: 13,
+                        fontFamily: 'Plus Jakarta Sans',
                       ),
                     ),
                   ),
@@ -128,19 +189,48 @@ class _LoginFormState extends State<LoginForm> {
             const SizedBox(height: 16),
           ],
 
-          // Tombol login
-          ElevatedButton(
-            onPressed: widget.isLoading ? null : _submit,
-            child: widget.isLoading
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: Colors.white,
-                    ),
-                  )
-                : const Text('Masuk'),
+          // Spasi panjang untuk menekan tombol ke bawah
+          const SizedBox(height: 60),
+
+          // ── Tombol MASUK ─────────────────────────────────────────
+          GestureDetector(
+            onTap: widget.isLoading ? null : _submit,
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 150),
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(vertical: 16),
+              decoration: ShapeDecoration(
+                color: widget.isLoading
+                    ? const Color(0xFFD4FF00).withValues(alpha: 0.55)
+                    : const Color(0xFFD4FF00),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+              ),
+              child: Center(
+                child: widget.isLoading
+                    ? const SizedBox(
+                        height: 22,
+                        width: 22,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2.5,
+                          color: Color(0xFF1B1B19),
+                        ),
+                      )
+                    : const Text(
+                        'MASUK',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          color: Color(0xFF1B1B19),
+                          fontSize: 16,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontWeight: FontWeight.w600,
+                          height: 1.50,
+                          letterSpacing: 1.60,
+                        ),
+                      ),
+              ),
+            ),
           ),
         ],
       ),
