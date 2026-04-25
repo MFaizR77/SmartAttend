@@ -148,6 +148,17 @@ class DatabaseService {
       record['_id'] = ObjectId();
     }
     
+    // Konversi string ISO ke BSON Date (DateTime) agar waktu asli tidak tertimpa waktu sync
+    if (record['timestamp'] is String) {
+      record['timestamp'] = DateTime.tryParse(record['timestamp']) ?? record['timestamp'];
+    }
+    if (record['createdAt'] is String) {
+      record['createdAt'] = DateTime.tryParse(record['createdAt']) ?? record['createdAt'];
+    }
+    if (record['updatedAt'] is String) {
+      record['updatedAt'] = DateTime.tryParse(record['updatedAt']) ?? record['updatedAt'];
+    }
+    
     await collection.insertOne(record);
   }
 
