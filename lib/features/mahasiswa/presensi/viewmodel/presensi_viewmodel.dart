@@ -92,6 +92,36 @@ class PresensiViewModel {
     }
   }
 
+  /// Validasi jendela waktu kelas (Local Time-Window)
+  bool isWithinTimeWindow(String jamStr) {
+    if (!jamStr.contains('-')) return true; // fallback aman jika format salah
+    
+    try {
+      final parts = jamStr.split('-');
+      final startParts = parts[0].trim().split(':');
+      final endParts = parts[1].trim().split(':');
+      
+      if (startParts.length == 2 && endParts.length == 2) {
+        final startHour = int.parse(startParts[0]);
+        final startMin = int.parse(startParts[1]);
+        final endHour = int.parse(endParts[0]);
+        final endMin = int.parse(endParts[1]);
+        
+        final now = DateTime.now();
+        final startTime = DateTime(now.year, now.month, now.day, startHour, startMin);
+        final endTime = DateTime(now.year, now.month, now.day, endHour, endMin);
+        
+        // Boleh absen 15 menit SEBELUM kelas dimulai, dan ditutup tepat saat kelas selesai
+        final allowedStart = startTime.subtract(const Duration(minutes: 15));
+        
+        return now.isAfter(allowedStart) && now.isBefore(endTime);
+      }
+    } catch (e) {
+      return true; // fallback aman
+    }
+    return true;
+  }
+
   void dispose() {
     isLoading.dispose();
     isHadir.dispose();

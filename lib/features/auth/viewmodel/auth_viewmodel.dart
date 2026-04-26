@@ -149,9 +149,9 @@ class AuthViewModel {
     isLoading.value = false;
     
     // Hapus sesi di Hive
-    final userBox = HiveHelper.userBoxInstance;
-    await userBox.delete('currentUser');
-    await userBox.delete('expiryDate');
+    // final userBox = HiveHelper.userBoxInstance; 
+    // await userBox.delete('currentUser');
+    // await userBox.delete('expiryDate'); 
 
     DatabaseService().close();
   }

@@ -37,6 +37,17 @@ class _PresensiScreenState extends State<PresensiScreen> {
   }
 
   void _handleCheckIn() async {
+    // 1. Validasi Jendela Waktu Lokal (Local Time-Window)
+    if (!_vm.isWithinTimeWindow(widget.jadwal['jam'] ?? '')) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Absen ditolak: Di luar jam perkuliahan (${widget.jadwal['jam']})'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+
     final jadwalId = widget.jadwal['id'] ?? '';
     if (jadwalId.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
