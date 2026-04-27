@@ -61,13 +61,16 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     child: SingleChildScrollView(
                       padding: EdgeInsets.fromLTRB(
                         24,
-                        78,
+                        24,
                         24,
                         124 + bottomInset,
                       ),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
+                          _buildStatistik(),
+                          const SizedBox(height: 24),
+
                           _buildSectionTitle('Jadwal Hari Ini'),
                           const SizedBox(height: 16),
                           _buildJadwalList(),
@@ -82,12 +85,12 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 ),
               ],
             ),
-            Positioned(
-              top: 180,
-              left: 24,
-              right: 24,
-              child: _buildStatistik(),
-            ),
+            // Positioned(
+            //   top: 180,
+            //   left: 24,
+            //   right: 24,
+            //   child: _buildStatistik(),
+            // ),
           ],
         ),
       ),
@@ -98,7 +101,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Widget _buildTopHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 84),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
       decoration: const BoxDecoration(
         color: _brand,
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
@@ -117,7 +120,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
                     height: 1.1,
-                    fontSize: 40,
+                    fontSize: 28,
                     letterSpacing: -0.6,
                   ),
                 ),
@@ -217,7 +220,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             BoxShadow(
               color: Color(0x19000000),
               blurRadius: 12,
-              offset: Offset(0, 6),
+              // offset: Offset(0, 6),
               spreadRadius: -6,
             ),
           ],
