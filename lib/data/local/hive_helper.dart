@@ -2,11 +2,13 @@ import 'package:hive_flutter/hive_flutter.dart';
 import 'models/record_presensi.dart';
 import 'models/sesi_absensi.dart';
 import 'models/pengajuan_izin.dart';
+import 'models/laporan_dosen.dart';
 
 class HiveHelper {
   static const String recordPresensiBox = 'record_presensi';
   static const String sesiAbsensiBox = 'sesi_absensi';
   static const String pengajuanIzinBox = 'pengajuan_izin';
+  static const String laporanDosenBox = 'laporan_dosen';
   static const String jadwalKuliahBox = 'jadwal_kuliah';
   static const String userBox = 'user';
 
@@ -20,12 +22,14 @@ class HiveHelper {
     Hive.registerAdapter(RecordPresensiAdapter());
     Hive.registerAdapter(SesiAbsensiAdapter());
     Hive.registerAdapter(PengajuanIzinAdapter());
+    Hive.registerAdapter(LaporanDosenAdapter());
   }
 
   static Future<void> openBoxes() async {
     await Hive.openBox<RecordPresensi>(recordPresensiBox);
     await Hive.openBox<SesiAbsensi>(sesiAbsensiBox);
     await Hive.openBox<PengajuanIzin>(pengajuanIzinBox);
+    await Hive.openBox<LaporanDosen>(laporanDosenBox);
     await Hive.openBox(jadwalKuliahBox);
     await Hive.openBox(userBox);
   }
@@ -38,6 +42,9 @@ class HiveHelper {
 
   static Box<PengajuanIzin> get pengajuanIzinBoxInstance =>
       Hive.box<PengajuanIzin>(pengajuanIzinBox);
+
+  static Box<LaporanDosen> get laporanDosenBoxInstance =>
+      Hive.box<LaporanDosen>(laporanDosenBox);
 
   static Box get jadwalKuliahBoxInstance => Hive.box(jadwalKuliahBox);
 

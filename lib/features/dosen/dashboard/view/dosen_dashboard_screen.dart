@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
+import '../../sesi/view/sesi_dosen_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
   final User user;
@@ -166,14 +167,29 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
         }
         return Column(
           children: jadwal.map((j) => Card(
-            child: ListTile(
-              leading: Container(
-                width: 40, height: 40,
-                decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-                child: const Icon(Icons.class_, color: AppColors.primary, size: 20),
+            clipBehavior: Clip.antiAlias,
+            child: InkWell(
+              onTap: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => SesiDosenScreen(
+                      user: widget.user,
+                      jadwal: j,
+                    ),
+                  ),
+                );
+              },
+              child: ListTile(
+                leading: Container(
+                  width: 40, height: 40,
+                  decoration: BoxDecoration(color: AppColors.primary.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
+                  child: const Icon(Icons.class_, color: AppColors.primary, size: 20),
+                ),
+                title: Text(j['mataKuliah'] ?? '', style: const TextStyle(fontWeight: FontWeight.w500)),
+                subtitle: Text('${j["jam"]}  •  ${j["ruang"]}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                trailing: const Icon(Icons.chevron_right, color: Colors.grey),
               ),
-              title: Text(j['mataKuliah'] ?? '', style: const TextStyle(fontWeight: FontWeight.w500)),
-              subtitle: Text('${j['jam']}  •  ${j['ruang']}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
             ),
           )).toList(),
         );

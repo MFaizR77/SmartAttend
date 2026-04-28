@@ -184,6 +184,73 @@ class DatabaseService {
     return record != null;
   }
 
+  /// Mendapatkan Laporan Dosen berdasarkan jadwalId dan tanggal hari ini
+  Future<Map<String, dynamic>?> getLaporanDosen(String jadwalId, String dosenId) async {
+    await connect();
+    final collection = _db!.collection('laporan_dosen');
+    
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final record = await collection.findOne({
+      'jadwalId': jadwalId,
+      'dosenId': dosenId,
+      'tanggal': {
+        '\$gte': startOfDay,
+        '\$lte': endOfDay,
+      }
+    });
+
+    return record;
+  }
+
+  /// Insert atau Update Laporan Dosen
+  Future<void> insertOrUpdateLaporanDosen(Map<String, dynamic> record) async {
+    await connect();
+    final collection = _db!.collection('laporan_dosen');
+    
+    // Pastikan konversi string date ke BSON Date
+    if (record['waktuMulai'] is String) {
+      record['waktuMulai'] = DateTime.tryParse(record['waktuMulai']) ?? record['waktuMulai'];
+    }
+    if (record['waktuSelesai'] is String && record['waktuSelesai'] != null) {
+      record['waktuSelesai'] = DateTime.tryParse(record['waktuSelesai']) ?? record['waktuSelesai'];
+    }
+    if (record['tanggal'] is String) {
+      record['tanggal'] = DateTime.tryParse(record['tanggal']) ?? record['tanggal'];
+    }
+
+    final query = {
+      'jadwalId': record['jadwalId'],
+      'dosenId': record['dosenId'],
+      'tanggal': {
+        '\$gte': DateTime(record['tanggal'].year, record['tanggal'].month, record['tanggal'].day),
+        '\$lte': DateTime(record['tanggal'].year, record['tanggal'].month, record['tanggal'].day, 23, 59, 59),
+      }
+    };
+
+    final existing = await collection.findOne(query);
+
+    if (existing != null) {
+      // Update
+      await collection.update(
+        where.id(existing['_id']),
+        modify
+            .set('waktuSelesai', record['waktuSelesai'])
+            .set('materi', record['materi'])
+            .set('updatedAt', DateTime.now()),
+      );
+    } else {
+      // Insert
+      if (!record.containsKey('_id')) {
+        record['_id'] = ObjectId();
+      }
+      record['createdAt'] = DateTime.now();
+      await collection.insertOne(record);
+    }
+  }
+
   /// Menutup koneksi database
   Future<void> close() async {
     if (_db != null) {
