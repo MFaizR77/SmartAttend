@@ -36,8 +36,8 @@ class OnboardingSlide extends StatelessWidget {
                           begin: const Alignment(0.50, 0.00),
                           end: const Alignment(0.50, 1.00),
                           colors: [
-                            AppColors.onboardingMint.withValues(alpha: 0.5),
-                            AppColors.onboardingMint.withValues(alpha: 0.0),
+                            AppColors.primaryBlue.withValues(alpha: 0.5),
+                            AppColors.primaryBlue.withValues(alpha: 0.0),
                           ],
                         ),
                         shape: RoundedRectangleBorder(
@@ -113,7 +113,7 @@ class OnboardingSlide extends StatelessWidget {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-/// Area ilustrasi: lingkaran latar kuning-hijau + gambar onboarding.
+/// Area ilustrasi
 // ────────────────────────────────────────────────────────────────────────────
 class _IllustrationArea extends StatelessWidget {
   final String imagePath;
@@ -128,18 +128,6 @@ class _IllustrationArea extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Lingkaran besar kuning-hijau (latar)
-          Container(
-            width: 320,
-            height: 320,
-            decoration: ShapeDecoration(
-              color: AppColors.brandLime.withValues(alpha: 0.3),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(9999)),
-              ),
-            ),
-          ),
-
           // Gambar onboarding
           Image.asset(imagePath, width: 280, height: 280, fit: BoxFit.contain),
         ],

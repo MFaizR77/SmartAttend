@@ -7,7 +7,8 @@
     <application
         android:label="SmartAttend"
         android:name="${applicationName}"
-        android:icon="@mipmap/logo_aplikasi">
+        android:icon="@mipmap/logo_aplikasi"
+        android:roundIcon="@mipmap/logo_aplikasi">
         <activity
             android:name=".MainActivity"
             android:exported="true"

@@ -28,7 +28,7 @@ class AuthViewModel {
           } else {
             userMap = Map<String, dynamic>.from(userDataStr as Map);
           }
-          
+
           currentUser.value = User.fromMap(userMap);
           return true;
         } catch (e) {
@@ -50,7 +50,7 @@ class AuthViewModel {
 
     // Validasi input
     if (identifier.trim().isEmpty) {
-      errorMessage.value = 'NIM/ID tidak boleh kosong';
+      errorMessage.value = 'Username tidak boleh kosong';
       return;
     }
     if (password.isEmpty) {
@@ -69,13 +69,19 @@ class AuthViewModel {
         if (dbUser['role'] == 'admin') mappedRole = UserRole.admin;
 
         final user = User(
-          id: dbUser['nim']?.toString() ?? dbUser['kode']?.toString() ?? dbUser['_id']?.toString() ?? '',
+          id:
+              dbUser['nim']?.toString() ??
+              dbUser['kode']?.toString() ??
+              dbUser['_id']?.toString() ??
+              '',
           nama: dbUser['nama'] ?? 'Unknown',
           email: dbUser['email'] ?? '',
           role: mappedRole,
-          passwordHash: password, // Simpan password plain yang diketik agar bisa dicek saat offline
-          createdAt: dbUser['createdAt'] != null 
-              ? DateTime.tryParse(dbUser['createdAt'].toString()) ?? DateTime.now()
+          passwordHash:
+              password, // Simpan password plain yang diketik agar bisa dicek saat offline
+          createdAt: dbUser['createdAt'] != null
+              ? DateTime.tryParse(dbUser['createdAt'].toString()) ??
+                    DateTime.now()
               : DateTime.now(),
           kelas: dbUser['kelas'],
         );
@@ -83,19 +89,23 @@ class AuthViewModel {
         // Simpan sesi ke Hive (Offline First)
         final userBox = HiveHelper.userBoxInstance;
         await userBox.put('currentUser', jsonEncode(user.toMap()));
-        await userBox.put('expiryDate', DateTime.now().add(const Duration(days: 1)).toIso8601String());
+        await userBox.put(
+          'expiryDate',
+          DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+        );
 
         currentUser.value = user;
         errorMessage.value = null;
       } else {
-        errorMessage.value = 'NIM/ID atau password salah';
+        errorMessage.value = 'Username atau password salah';
       }
     } catch (e) {
       // Jika gagal connect ke server (offline), coba validasi dengan data lokal di Hive
-      final isNetworkError = e.toString().contains('SocketException') || 
-                             e.toString().contains('ConnectionException') ||
-                             e.toString().contains('HandshakeException');
-      
+      final isNetworkError =
+          e.toString().contains('SocketException') ||
+          e.toString().contains('ConnectionException') ||
+          e.toString().contains('HandshakeException');
+
       if (isNetworkError) {
         final userBox = HiveHelper.userBoxInstance;
         final userDataStr = userBox.get('currentUser');
@@ -110,10 +120,14 @@ class AuthViewModel {
               userMap = Map<String, dynamic>.from(userDataStr as Map);
             }
             final localUser = User.fromMap(userMap);
-            
+
             // Pengecekan kredensial lokal
-            final isIdentifierMatch = localUser.id == identifier.trim() || localUser.email == identifier.trim();
-            final isPasswordMatch = localUser.passwordHash == password; // asumsikan passwordHash di lokal nyimpan password / hash yg sama
+            final isIdentifierMatch =
+                localUser.id == identifier.trim() ||
+                localUser.email == identifier.trim();
+            final isPasswordMatch =
+                localUser.passwordHash ==
+                password; // asumsikan passwordHash di lokal nyimpan password / hash yg sama
 
             if (isIdentifierMatch && isPasswordMatch) {
               final expiryDate = DateTime.tryParse(expiryStr.toString());
@@ -123,16 +137,19 @@ class AuthViewModel {
                 isLoading.value = false;
                 return; // Sukses login offline
               } else {
-                errorMessage.value = 'Sesi offline telah kadaluarsa (lebih dari 1 hari). Anda harus online.';
+                errorMessage.value =
+                    'Sesi offline telah kadaluarsa (lebih dari 1 hari). Anda harus online.';
               }
             } else {
-              errorMessage.value = 'NIM/ID atau password salah (Mode Offline)';
+              errorMessage.value =
+                  'Username atau password salah (Mode Offline)';
             }
           } catch (offlineErr) {
             errorMessage.value = 'Gagal membaca sesi offline: $offlineErr';
           }
         } else {
-          errorMessage.value = 'Anda sedang offline dan belum pernah login sebelumnya di perangkat ini.';
+          errorMessage.value =
+              'Anda sedang offline dan belum pernah login sebelumnya di perangkat ini.';
         }
       } else {
         errorMessage.value = 'Terjadi kesalahan: $e';
@@ -147,11 +164,11 @@ class AuthViewModel {
     currentUser.value = null;
     errorMessage.value = null;
     isLoading.value = false;
-    
+
     // Hapus sesi di Hive
-    // final userBox = HiveHelper.userBoxInstance; 
+    // final userBox = HiveHelper.userBoxInstance;
     // await userBox.delete('currentUser');
-    // await userBox.delete('expiryDate'); 
+    // await userBox.delete('expiryDate');
 
     DatabaseService().close();
   }

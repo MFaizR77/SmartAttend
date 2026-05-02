@@ -78,10 +78,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextSpan(
                               text: 'SMART',
                               style: TextStyle(
-                                color: AppColors.brandLime,
-                                fontSize: 40,
+                                color: AppColors.orange,
+                                fontSize: 57,
                                 fontFamily: 'Inter',
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.bold,
                                 height: 1.20,
                                 letterSpacing: -1.20,
                               ),
@@ -89,10 +89,10 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextSpan(
                               text: 'ATTEND',
                               style: TextStyle(
-                                color: AppColors.grayDark,
-                                fontSize: 40,
+                                color: AppColors.primaryBlue,
+                                fontSize: 57,
                                 fontFamily: 'Inter',
-                                fontWeight: FontWeight.w700,
+                                fontWeight: FontWeight.bold,
                                 height: 1.20,
                                 letterSpacing: -1.20,
                               ),
@@ -133,14 +133,6 @@ class _LoginScreenState extends State<LoginScreen> {
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      shadows: const [
-                        BoxShadow(
-                          color: AppColors.grayDark,
-                          blurRadius: 0,
-                          offset: Offset(4, 4),
-                          spreadRadius: 0,
-                        ),
-                      ],
                     ),
                     child: ValueListenableBuilder<bool>(
                       valueListenable: _vm.isLoading,

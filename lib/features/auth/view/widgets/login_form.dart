@@ -93,7 +93,7 @@ class _LoginFormState extends State<LoginForm> {
                 size: 20,
               ),
               filled: true,
-              fillColor: AppColors.cream,
+              fillColor: AppColors.surface,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -142,7 +142,7 @@ class _LoginFormState extends State<LoginForm> {
                     setState(() => _obscurePassword = !_obscurePassword),
               ),
               filled: true,
-              fillColor: const Color(0xFFF5F0E8),
+              fillColor: AppColors.surface,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -203,8 +203,8 @@ class _LoginFormState extends State<LoginForm> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: ShapeDecoration(
                 color: widget.isLoading
-                    ? AppColors.brandLime.withValues(alpha: 0.55)
-                    : AppColors.brandLime,
+                    ? AppColors.primaryBlue.withValues(alpha: 0.55)
+                    : AppColors.primaryBlue,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -223,7 +223,7 @@ class _LoginFormState extends State<LoginForm> {
                         'MASUK',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: AppColors.charcoal,
+                          color: AppColors.surface,
                           fontSize: 16,
                           fontFamily: 'Plus Jakarta Sans',
                           fontWeight: FontWeight.w600,
