@@ -11,10 +11,15 @@ class PresensiViewModel {
   final ValueNotifier<bool> isHadir = ValueNotifier(false);
   final ValueNotifier<String?> errorMessage = ValueNotifier(null);
   final ValueNotifier<bool> isOfflineMode = ValueNotifier(false);
+  final ValueNotifier<bool> isKelasBuka = ValueNotifier(false);
 
   Future<void> checkInitialStatus(String jadwalId, User user) async {
     isLoading.value = true;
     try {
+      // Cek apakah kelas sedang berjalan (dari sisi Dosen)
+      final kelasBerjalan = await DatabaseService().isKelasBerjalan(jadwalId);
+      isKelasBuka.value = kelasBerjalan;
+
       // 1. Cek dari lokal (Hive) dulu
       final presensiBox = HiveHelper.recordPresensiBoxInstance;
       final localRecords = presensiBox.values.where((r) => 
@@ -126,5 +131,6 @@ class PresensiViewModel {
     isLoading.dispose();
     isHadir.dispose();
     errorMessage.dispose();
+    isKelasBuka.dispose();
   }
 }
