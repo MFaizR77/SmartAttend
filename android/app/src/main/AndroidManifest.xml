@@ -5,9 +5,9 @@
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     
     <application
-        android:label="smartattend"
+        android:label="SmartAttend"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/logo_aplikasi">
         <activity
             android:name=".MainActivity"
             android:exported="true"

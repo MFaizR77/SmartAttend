@@ -10,6 +10,26 @@ class AppColors {
   static const Color surface = Color(0xFFFFFFFF);
   static const Color surfaceVariant = Color(0xFFF0F0F5);
 
+  // Brand & Feature specific
+  static const Color brandLime = Color(0xFFD4FF00);
+  static const Color charcoal = Color(0xFF1B1B19);
+  static const Color grayDark = Color(0xFF1A1A1A);
+  static const Color grayMedium = Color(0xFF4A4A4A);
+  static const Color graySlate = Color(0xFF4B5563);
+  static const Color grayLight = Color(0xFF9CA3AF);
+  static const Color cream = Color(0xFFF5F0E8);
+  static const Color skyBlue = Color(0xFFD6E3FF);
+  static const Color royalBlue = Color(0xFF0055FF);
+  static const Color softText = Color(0xFF6B7280);
+  static const Color grayDeep = Color(0xFF414941);
+  static const Color dashboardSurface = Color(0xFFF8F8F8);
+  static const Color stroke = Color(0xFFF3F4F6);
+
+  // Onboarding specific
+  static const Color onboardingBackground = Color(0xFFF3F7F8);
+  static const Color onboardingDotInactive = Color(0xFFC4C7C5);
+  static const Color onboardingMint = Color(0xFFD9EDDB);
+
   // Primary
   static const Color primary = Color(0xFF1E1E2C);
   static const Color primaryLight = Color(0xFF2D2D3F);

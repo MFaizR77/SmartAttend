@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import '../../../data/local/models/user.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import 'widgets/login_form.dart';
@@ -54,7 +55,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF8F9FA),
+      backgroundColor: AppColors.dashboardSurface,
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -77,7 +78,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextSpan(
                               text: 'SMART',
                               style: TextStyle(
-                                color: const Color(0xFFD4FF00),
+                                color: AppColors.brandLime,
                                 fontSize: 40,
                                 fontFamily: 'Inter',
                                 fontWeight: FontWeight.w700,
@@ -88,7 +89,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             TextSpan(
                               text: 'ATTEND',
                               style: TextStyle(
-                                color: const Color(0xFF1A1A1A),
+                                color: AppColors.grayDark,
                                 fontSize: 40,
                                 fontFamily: 'Inter',
                                 fontWeight: FontWeight.w700,
@@ -104,7 +105,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         'Selamat Datang!!',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF4A4A4A),
+                          color: AppColors.grayMedium,
                           fontSize: 18,
                           fontFamily: 'Plus Jakarta Sans',
                           fontWeight: FontWeight.w400,
@@ -128,13 +129,13 @@ class _LoginScreenState extends State<LoginScreen> {
                       shape: RoundedRectangleBorder(
                         side: const BorderSide(
                           width: 2,
-                          color: Color(0xFF1A1A1A),
+                          color: AppColors.grayDark,
                         ),
                         borderRadius: BorderRadius.circular(8),
                       ),
                       shadows: const [
                         BoxShadow(
-                          color: Color(0xFF1A1A1A),
+                          color: AppColors.grayDark,
                           blurRadius: 0,
                           offset: Offset(4, 4),
                           spreadRadius: 0,
@@ -165,11 +166,11 @@ class _LoginScreenState extends State<LoginScreen> {
                   //   width: double.infinity,
                   //   padding: const EdgeInsets.all(16),
                   //   decoration: ShapeDecoration(
-                  //     color: const Color(0xFFD6E3FF),
+                  //     color: AppColors.skyBlue,
                   //     shape: RoundedRectangleBorder(
                   //       side: const BorderSide(
                   //         width: 2,
-                  //         color: Color(0xFF1A1A1A),
+                  //         color: AppColors.grayDark,
                   //       ),
                   //       borderRadius: BorderRadius.circular(4),
                   //     ),
@@ -179,7 +180,7 @@ class _LoginScreenState extends State<LoginScreen> {
                   //     'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
                   //     'Gunakan sesuai data di database.',
                   //     style: TextStyle(
-                  //       color: Color(0xFF0055FF),
+                  //       color: AppColors.royalBlue,
                   //       fontSize: 10,
                   //       fontFamily: 'Plus Jakarta Sans',
                   //       fontWeight: FontWeight.w400,

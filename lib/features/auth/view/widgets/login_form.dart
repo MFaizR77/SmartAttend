@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 
 /// Form login reusable dengan desain baru (retro style).
 /// Hanya UI — logika login dipanggil via callback [onLogin].
@@ -37,7 +38,7 @@ class _LoginFormState extends State<LoginForm> {
   }
 
   // ── Shared border decoration ──────────────────────────────────────
-  OutlineInputBorder _border({Color color = const Color(0xFF1A1A1A)}) =>
+  OutlineInputBorder _border({Color color = AppColors.grayDark}) =>
       OutlineInputBorder(
         borderRadius: BorderRadius.circular(4),
         borderSide: BorderSide(width: 2, color: color),
@@ -45,7 +46,7 @@ class _LoginFormState extends State<LoginForm> {
 
   // ── Shared label style ────────────────────────────────────────────
   static const TextStyle _labelStyle = TextStyle(
-    color: Color(0xFF1A1A1A),
+    color: AppColors.grayDark,
     fontSize: 12,
     fontFamily: 'Plus Jakarta Sans',
     fontWeight: FontWeight.w400,
@@ -62,7 +63,7 @@ class _LoginFormState extends State<LoginForm> {
   );
 
   static const TextStyle _inputStyle = TextStyle(
-    color: Color(0xFF1A1A1A),
+    color: AppColors.grayDark,
     fontSize: 16,
     fontFamily: 'Plus Jakarta Sans',
     fontWeight: FontWeight.w400,
@@ -88,11 +89,11 @@ class _LoginFormState extends State<LoginForm> {
               hintStyle: _hintStyle,
               prefixIcon: const Icon(
                 Icons.person_outline,
-                color: Color(0xFF1A1A1A),
+                color: AppColors.grayDark,
                 size: 20,
               ),
               filled: true,
-              fillColor: const Color(0xFFF5F0E8),
+              fillColor: AppColors.cream,
               contentPadding: const EdgeInsets.symmetric(
                 horizontal: 16,
                 vertical: 14,
@@ -126,7 +127,7 @@ class _LoginFormState extends State<LoginForm> {
               hintStyle: _hintStyle,
               prefixIcon: const Icon(
                 Icons.lock_outline,
-                color: Color(0xFF1A1A1A),
+                color: AppColors.grayDark,
                 size: 20,
               ),
               suffixIcon: IconButton(
@@ -134,7 +135,7 @@ class _LoginFormState extends State<LoginForm> {
                   _obscurePassword
                       ? Icons.visibility_outlined
                       : Icons.visibility_off_outlined,
-                  color: const Color(0xFF1A1A1A),
+                  color: AppColors.grayDark,
                   size: 20,
                 ),
                 onPressed: () =>
@@ -202,8 +203,8 @@ class _LoginFormState extends State<LoginForm> {
               padding: const EdgeInsets.symmetric(vertical: 16),
               decoration: ShapeDecoration(
                 color: widget.isLoading
-                    ? const Color(0xFFD4FF00).withValues(alpha: 0.55)
-                    : const Color(0xFFD4FF00),
+                    ? AppColors.brandLime.withValues(alpha: 0.55)
+                    : AppColors.brandLime,
                 shape: RoundedRectangleBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -215,14 +216,14 @@ class _LoginFormState extends State<LoginForm> {
                         width: 22,
                         child: CircularProgressIndicator(
                           strokeWidth: 2.5,
-                          color: Color(0xFF1B1B19),
+                          color: AppColors.charcoal,
                         ),
                       )
                     : const Text(
                         'MASUK',
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: Color(0xFF1B1B19),
+                          color: AppColors.charcoal,
                           fontSize: 16,
                           fontFamily: 'Plus Jakarta Sans',
                           fontWeight: FontWeight.w600,
