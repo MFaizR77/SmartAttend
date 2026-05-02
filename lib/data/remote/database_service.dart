@@ -205,6 +205,32 @@ class DatabaseService {
     return record;
   }
 
+  /// Mengecek apakah kelas sedang berjalan (Dosen sudah menekan Mulai Kuliah, tapi belum Selesai)
+  Future<bool> isKelasBerjalan(String jadwalId) async {
+    await connect();
+    final collection = _db!.collection('laporan_dosen');
+    
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final record = await collection.findOne({
+      'jadwalId': jadwalId,
+      'tanggal': {
+        '\$gte': startOfDay,
+        '\$lte': endOfDay,
+      }
+    });
+
+    if (record == null) return false;
+    
+    // Jika waktuMulai ada dan waktuSelesai belum ada, berarti kelas sedang berjalan
+    final waktuMulai = record['waktuMulai'];
+    final waktuSelesai = record['waktuSelesai'];
+    
+    return waktuMulai != null && waktuSelesai == null;
+  }
+
   /// Insert atau Update Laporan Dosen
   Future<void> insertOrUpdateLaporanDosen(Map<String, dynamic> record) async {
     await connect();

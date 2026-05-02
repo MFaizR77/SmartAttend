@@ -2,6 +2,10 @@ import 'package:flutter/material.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
 import '../../presensi/view/presensi_screen.dart';
+import 'dart:async';
+import '../../../../data/remote/database_service.dart';
+import '../../../../core/services/notification_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -23,6 +27,8 @@ class MahasiswaDashboardScreen extends StatefulWidget {
 class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   final _vm = MahasiswaDashboardViewModel();
   int _currentNavIndex = 0;
+  Timer? _pollingTimer;
+  final Set<String> _notifiedJadwalIds = {};
 
   static const Color _ink = Color(0xFF1A1A1A);
   static const Color _softText = Color(0xFF6B7280);
@@ -34,10 +40,53 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (!mounted) return;
+      final jadwalHariIni = _vm.jadwalHariIni.value;
+      if (jadwalHariIni.isEmpty) return;
+
+      for (final jadwal in jadwalHariIni) {
+        final jadwalId = jadwal['id'] ?? '';
+        final namaMK = jadwal['mataKuliah'] ?? 'Kelas';
+        
+        if (jadwalId.isEmpty || _notifiedJadwalIds.contains(jadwalId)) continue;
+        
+        try {
+          final isBuka = await DatabaseService().isKelasBerjalan(jadwalId);
+          if (isBuka && mounted) {
+            _notifiedJadwalIds.add(jadwalId);
+            
+            // Tampilkan Notifikasi
+            await NotificationService().flutterLocalNotificationsPlugin.show(
+              jadwalId.hashCode,
+              'Absensi Terbuka!',
+              'Absensi untuk kelas $namaMK sudah dibuka oleh dosen.',
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  'mahasiswa_channel',
+                  'Notifikasi Mahasiswa',
+                  channelDescription: 'Notifikasi absensi untuk mahasiswa',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                ),
+                iOS: DarwinNotificationDetails(),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error polling status: $e');
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _vm.dispose();
     super.dispose();
   }
