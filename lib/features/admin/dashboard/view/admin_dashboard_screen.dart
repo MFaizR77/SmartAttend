@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/admin_dashboard_viewmodel.dart';
+import '../../approval_jadwal/view/approval_jadwal_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final User user;
@@ -181,6 +182,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget _menuGrid(BuildContext context) {
     final menus = [
       {'icon': Icons.people, 'label': 'Manajemen User'},
+      {'icon': Icons.domain_verification, 'label': 'Approval Ruangan'},
       {'icon': Icons.calendar_month, 'label': 'Manajemen Jadwal'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
       {'icon': Icons.download, 'label': 'Export'},
@@ -191,7 +193,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       children: menus.map((m) => Card(
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur ini belum tersedia'), duration: Duration(seconds: 1))),
+          onTap: () {
+            if (m['label'] == 'Approval Ruangan') {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const ApprovalJadwalScreen()));
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur ini belum tersedia'), duration: Duration(seconds: 1)));
+            }
+          },
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [

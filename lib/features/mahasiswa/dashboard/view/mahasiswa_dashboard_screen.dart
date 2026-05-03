@@ -40,6 +40,9 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
+    
+    // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
+    NotificationService().requestPermission();
     _startPolling();
   }
 
@@ -120,9 +123,31 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                           _buildStatistik(),
                           const SizedBox(height: 24),
 
-                          _buildSectionTitle('Jadwal Hari Ini'),
+                          _buildSectionTitle('Jadwal Asli'),
                           const SizedBox(height: 16),
                           _buildJadwalList(),
+
+                          ValueListenableBuilder<List<Map<String, String>>>(
+                            valueListenable: _vm.jadwalPenggantiHariIni,
+                            builder: (context, pengganti, _) {
+                              if (pengganti.isEmpty) return const SizedBox.shrink();
+                              return Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const SizedBox(height: 24),
+                                  _buildSectionTitle('Jadwal Pengganti'),
+                                  const SizedBox(height: 16),
+                                  ...pengganti.map((j) {
+                                    return Padding(
+                                      padding: const EdgeInsets.only(bottom: 12),
+                                      child: _buildJadwalCard(j, isPengganti: true),
+                                    );
+                                  }),
+                                ],
+                              );
+                            },
+                          ),
+
                           const SizedBox(height: 34),
                           _buildSectionTitle('Menu Cepat'),
                           const SizedBox(height: 16),
@@ -356,7 +381,10 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     );
   }
 
-  Widget _buildJadwalCard(Map<String, String> jadwal) {
+  Widget _buildJadwalCard(Map<String, String> jadwal, {bool isPengganti = false}) {
+    final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
+    final iconColor = isPengganti ? Colors.blue : _ink;
+    final iconBgColor = isPengganti ? Colors.blue.shade100 : const Color(0x33D0FF00);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -376,7 +404,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _stroke),
             boxShadow: const [
@@ -393,11 +421,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0x33D0FF00),
+                  color: iconBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child:
-                    const Icon(Icons.computer_outlined, color: _ink, size: 24),
+                    Icon(Icons.computer_outlined, color: iconColor, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
