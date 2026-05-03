@@ -11,6 +11,49 @@ class PresensiViewModel {
   final ValueNotifier<bool> isHadir = ValueNotifier(false);
   final ValueNotifier<String?> errorMessage = ValueNotifier(null);
   final ValueNotifier<bool> isOfflineMode = ValueNotifier(false);
+  final ValueNotifier<bool> isKelasBuka = ValueNotifier(false);
+
+  Future<void> checkInitialStatus(String jadwalId, User user) async {
+    isLoading.value = true;
+    try {
+      // Cek apakah kelas sedang berjalan (dari sisi Dosen)
+      final kelasBerjalan = await DatabaseService().isKelasBerjalan(jadwalId);
+      isKelasBuka.value = kelasBerjalan;
+
+      // 1. Cek dari lokal (Hive) dulu
+      final presensiBox = HiveHelper.recordPresensiBoxInstance;
+      final localRecords = presensiBox.values.where((r) => 
+        r.sesiId == jadwalId && 
+        r.mahasiswaId == user.id &&
+        r.timestamp.day == DateTime.now().day &&
+        r.timestamp.month == DateTime.now().month &&
+        r.timestamp.year == DateTime.now().year
+      ).toList();
+
+      if (localRecords.isNotEmpty) {
+        isHadir.value = true;
+        isOfflineMode.value = localRecords.first.syncStatus != 'synced';
+        isLoading.value = false;
+        return;
+      }
+
+      // 2. Jika tidak ada di lokal, cek online (ke MongoDB)
+      final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
+      final isOnline = connectivityResult.isNotEmpty && !connectivityResult.contains(ConnectivityResult.none);
+      
+      if (isOnline) {
+        final exists = await DatabaseService().checkPresensiExists(jadwalId, user.id);
+        if (exists) {
+          isHadir.value = true;
+          isOfflineMode.value = false;
+        }
+      }
+    } catch (e) {
+      print('Error checking initial presensi status: $e');
+    } finally {
+      isLoading.value = false;
+    }
+  }
 
   Future<void> doCheckIn(String jadwalId, User user) async {
     isLoading.value = true;
@@ -54,9 +97,40 @@ class PresensiViewModel {
     }
   }
 
+  /// Validasi jendela waktu kelas (Local Time-Window)
+  bool isWithinTimeWindow(String jamStr) {
+    if (!jamStr.contains('-')) return true; // fallback aman jika format salah
+    
+    try {
+      final parts = jamStr.split('-');
+      final startParts = parts[0].trim().split(':');
+      final endParts = parts[1].trim().split(':');
+      
+      if (startParts.length == 2 && endParts.length == 2) {
+        final startHour = int.parse(startParts[0]);
+        final startMin = int.parse(startParts[1]);
+        final endHour = int.parse(endParts[0]);
+        final endMin = int.parse(endParts[1]);
+        
+        final now = DateTime.now();
+        final startTime = DateTime(now.year, now.month, now.day, startHour, startMin);
+        final endTime = DateTime(now.year, now.month, now.day, endHour, endMin);
+        
+        // Boleh absen 15 menit SEBELUM kelas dimulai, dan ditutup tepat saat kelas selesai
+        final allowedStart = startTime.subtract(const Duration(minutes: 15));
+        
+        return now.isAfter(allowedStart) && now.isBefore(endTime);
+      }
+    } catch (e) {
+      return true; // fallback aman
+    }
+    return true;
+  }
+
   void dispose() {
     isLoading.dispose();
     isHadir.dispose();
     errorMessage.dispose();
+    isKelasBuka.dispose();
   }
 }

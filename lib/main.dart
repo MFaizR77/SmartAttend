@@ -10,13 +10,23 @@ import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/services/sync_manager.dart';
+import 'core/services/notification_service.dart';
+import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
-
+  
+  // Inisialisasi proses sinkronisasi background
+  SyncManager().init();
+  
+  // Inisialisasi notifikasi & timezone
+  tz.initializeTimeZones();
+  await NotificationService().init();
+  
   final authViewModel = AuthViewModel();
   final hasSession = await authViewModel.checkOfflineSession();
 

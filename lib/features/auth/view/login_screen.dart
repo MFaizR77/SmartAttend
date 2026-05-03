@@ -161,32 +161,32 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
 
                   // ── Info box akun testing (hapus di production) ──
-                  Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(16),
-                    decoration: ShapeDecoration(
-                      color: const Color(0xFFD6E3FF),
-                      shape: RoundedRectangleBorder(
-                        side: const BorderSide(
-                          width: 2,
-                          color: Color(0xFF1A1A1A),
-                        ),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                    ),
-                    child: const Text(
-                      'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
-                      'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
-                      'Gunakan sesuai data di database.',
-                      style: TextStyle(
-                        color: Color(0xFF0055FF),
-                        fontSize: 10,
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontWeight: FontWeight.w400,
-                        height: 1.25,
-                      ),
-                    ),
-                  ),
+                  // Container(
+                  //   width: double.infinity,
+                  //   padding: const EdgeInsets.all(16),
+                  //   decoration: ShapeDecoration(
+                  //     color: const Color(0xFFD6E3FF),
+                  //     shape: RoundedRectangleBorder(
+                  //       side: const BorderSide(
+                  //         width: 2,
+                  //         color: Color(0xFF1A1A1A),
+                  //       ),
+                  //       borderRadius: BorderRadius.circular(4),
+                  //     ),
+                  //   ),
+                  //   child: const Text(
+                  //     'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
+                  //     'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
+                  //     'Gunakan sesuai data di database.',
+                  //     style: TextStyle(
+                  //       color: Color(0xFF0055FF),
+                  //       fontSize: 10,
+                  //       fontFamily: 'Plus Jakarta Sans',
+                  //       fontWeight: FontWeight.w400,
+                  //       height: 1.25,
+                  //     ),
+                  //   ),
+                  // ),
                 ],
               ),
             ),
