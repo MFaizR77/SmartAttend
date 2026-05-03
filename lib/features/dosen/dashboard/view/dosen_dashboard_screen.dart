@@ -3,6 +3,8 @@ import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
 import '../../sesi/view/sesi_dosen_screen.dart';
+import '../../pergantian_jadwal/view/pencarian_ruang_screen.dart';
+import '../../rekapan/view/rekapan_laporan_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
   final User user;
@@ -201,7 +203,8 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
     final menus = [
       {'icon': Icons.play_circle_outline, 'label': 'Buka Sesi'},
       {'icon': Icons.fact_check_outlined, 'label': 'Approval Izin'},
-      {'icon': Icons.bar_chart, 'label': 'Rekap'},
+      {'icon': Icons.find_replace, 'label': 'Cari Ruang'},
+      {'icon': Icons.assignment_turned_in, 'label': 'Rekapan Laporan'},
     ];
     return GridView.count(
       crossAxisCount: 3, shrinkWrap: true, physics: const NeverScrollableScrollPhysics(),
@@ -209,7 +212,15 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       children: menus.map((m) => Card(
         child: InkWell(
           borderRadius: BorderRadius.circular(12),
-          onTap: () => ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur ini belum tersedia'), duration: Duration(seconds: 1))),
+          onTap: () {
+            if (m['label'] == 'Cari Ruang') {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => PencarianRuangScreen(user: widget.user)));
+            } else if (m['label'] == 'Rekapan Laporan') {
+              Navigator.push(context, MaterialPageRoute(builder: (context) => RekapanLaporanScreen(user: widget.user)));
+            } else {
+              ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur ini belum tersedia'), duration: Duration(seconds: 1)));
+            }
+          },
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
