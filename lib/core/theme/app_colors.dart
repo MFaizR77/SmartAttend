@@ -6,22 +6,24 @@ class AppColors {
   AppColors._();
 
   // Background & Surface
-  static const Color background = Color(0xFFF5F5F5);
-  static const Color surface = Color(0xFFFFFFFF);
-  static const Color surfaceVariant = Color(0xFFF0F0F5);
+  static const Color background = Color(0xFFFFFFFF);
+  static const Color surface = Color(0xFFF8F8F8);
+  static const Color surfaceVariant = Color(0xFFFFFFFF);
 
-  // Primary
-  static const Color primary = Color(0xFF1E1E2C);
+  // Primary (Ink & Brand)
+  static const Color primary = Color(0xFF1A1A1A); // _ink
   static const Color primaryLight = Color(0xFF2D2D3F);
+  static const Color brand = Color(0xFFD0FF00); // Lime Green
 
   // Accent
   static const Color accent = Color(0xFF3B82F6);
   static const Color accentLight = Color(0xFFDBEAFE);
 
   // Text
-  static const Color textPrimary = Color(0xFF1E1E2C);
-  static const Color textSecondary = Color(0xFF6B7280);
+  static const Color textPrimary = Color(0xFF1A1A1A); // _ink
+  static const Color textSecondary = Color(0xFF6B7280); // _softText
   static const Color textOnPrimary = Color(0xFFFFFFFF);
+  static const Color textOnBrand = Color(0xFF1A1A1A);
 
   // Status
   static const Color success = Color(0xFF22C55E);
@@ -29,6 +31,6 @@ class AppColors {
   static const Color error = Color(0xFFEF4444);
 
   // Border & Divider
-  static const Color border = Color(0xFFE5E7EB);
+  static const Color border = Color(0xFFF3F4F6); // _stroke
   static const Color divider = Color(0xFFF3F4F6);
 }

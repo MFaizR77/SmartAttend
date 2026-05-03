@@ -10,27 +10,33 @@ class DatabaseService {
   bool _isConnecting = false;
 
   Future<void> connect() async {
-    // Tunggu jika sedang ada proses koneksi lain yang berjalan
-    while (_isConnecting) {
-      await Future.delayed(const Duration(milliseconds: 100));
+    // Jika sedang konek, tunggu sampai selesai
+    if (_isConnecting) {
+      while (_isConnecting) {
+        await Future.delayed(const Duration(milliseconds: 50));
+      }
+      if (_db != null && _db!.isConnected) return;
     }
 
     if (_db != null) {
+      if (_db!.state == State.OPENING) {
+        while (_db!.state == State.OPENING) {
+          await Future.delayed(const Duration(milliseconds: 50));
+        }
+        return;
+      }
       if (_db!.isConnected) {
-        // Coba ping untuk memastikan socket tidak mati
         try {
           await _db!.serverStatus();
+          return;
         } catch (_) {
           _db = null;
         }
       }
     }
     
-    if (_db != null && _db!.isConnected) return;
-    
     _isConnecting = true;
     try {
-      // Ambil MONGODB_URI
       final mongoUri = dotenv.env['MONGODB_URI'];
       if (mongoUri == null || mongoUri.isEmpty) {
         throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
@@ -237,6 +243,18 @@ class DatabaseService {
     });
 
     return record;
+  }
+
+  /// Mendapatkan semua laporan BAP Dosen berdasarkan dosenId
+  Future<List<Map<String, dynamic>>> getAllLaporanDosen(String dosenId) async {
+    await connect();
+    final collection = _db!.collection('laporan_dosen');
+    
+    final records = await collection.find({
+      'dosenId': dosenId,
+    }).toList();
+    
+    return records;
   }
 
   /// Mengecek apakah kelas sedang berjalan (Dosen sudah menekan Mulai Kuliah, tapi belum Selesai)

@@ -1,7 +1,11 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
 import '../../presensi/view/presensi_screen.dart';
+import '../../jadwal/view/jadwal_screen.dart';
+import '../../rekap/view/rekap_screen.dart';
+import '../../../profil/view/profil_screen.dart';
 import 'dart:async';
 import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
@@ -99,76 +103,82 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: Stack(
+        child: IndexedStack(
+          index: _currentNavIndex,
           children: [
-            Column(
-              children: [
-                _buildTopHeader(),
-                Expanded(
-                  child: Container(
-                    color: _surface,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        24,
-                        24,
-                        24,
-                        124 + bottomInset,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildStatistik(),
-                          const SizedBox(height: 24),
-
-                          _buildSectionTitle('Jadwal Asli'),
-                          const SizedBox(height: 16),
-                          _buildJadwalList(),
-
-                          ValueListenableBuilder<List<Map<String, String>>>(
-                            valueListenable: _vm.jadwalPenggantiHariIni,
-                            builder: (context, pengganti, _) {
-                              if (pengganti.isEmpty) return const SizedBox.shrink();
-                              return Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const SizedBox(height: 24),
-                                  _buildSectionTitle('Jadwal Pengganti'),
-                                  const SizedBox(height: 16),
-                                  ...pengganti.map((j) {
-                                    return Padding(
-                                      padding: const EdgeInsets.only(bottom: 12),
-                                      child: _buildJadwalCard(j, isPengganti: true),
-                                    );
-                                  }),
-                                ],
-                              );
-                            },
-                          ),
-
-                          const SizedBox(height: 34),
-                          _buildSectionTitle('Menu Cepat'),
-                          const SizedBox(height: 16),
-                          _buildMenuRow(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Positioned(
-            //   top: 180,
-            //   left: 24,
-            //   right: 24,
-            //   child: _buildStatistik(),
-            // ),
+            _buildDashboardContent(bottomInset),
+            JadwalScreen(user: widget.user),
+            RekapScreen(user: widget.user),
+            ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomNav(bottomInset),
+    );
+  }
+
+  Widget _buildDashboardContent(double bottomInset) {
+    return Stack(
+      children: [
+        Column(
+          children: [
+            _buildTopHeader(),
+            Expanded(
+              child: Container(
+                color: _surface,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    24,
+                    24,
+                    124 + bottomInset,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStatistik(),
+                      const SizedBox(height: 24),
+
+                      _buildSectionTitle('Jadwal Asli'),
+                      const SizedBox(height: 16),
+                      _buildJadwalList(),
+
+                      ValueListenableBuilder<List<Map<String, String>>>(
+                        valueListenable: _vm.jadwalPenggantiHariIni,
+                        builder: (context, pengganti, _) {
+                          if (pengganti.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 24),
+                              _buildSectionTitle('Jadwal Pengganti'),
+                              const SizedBox(height: 16),
+                              ...pengganti.map((j) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildJadwalCard(j, isPengganti: true),
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 34),
+                      _buildSectionTitle('Menu Cepat'),
+                      const SizedBox(height: 16),
+                      _buildMenuRow(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -482,7 +492,15 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             child: Padding(
               padding: EdgeInsets.only(right: menu == menus.last ? 0 : 10),
               child: GestureDetector(
-                onTap: () => _showComingSoon(context),
+                onTap: () {
+                  if (menu['label'] == 'Jadwal') {
+                    setState(() => _currentNavIndex = 1);
+                  } else if (menu['label'] == 'Rekap') {
+                    setState(() => _currentNavIndex = 2);
+                  } else {
+                    _showComingSoon(context);
+                  }
+                },
                 child: Column(
                   children: [
                     Container(
@@ -548,12 +566,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () {
-                  if (i == 0) {
-                    setState(() => _currentNavIndex = i);
-                    return;
-                  }
                   setState(() => _currentNavIndex = i);
-                  _showComingSoon(context);
                 },
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
