@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 import '../../../data/local/models/user.dart';
 import '../../../data/remote/database_service.dart';
 import '../../../data/local/hive_helper.dart';
@@ -23,7 +24,7 @@ class AuthViewModel {
           currentUser.value = User.fromMap(userData as Map<dynamic, dynamic>);
           return true;
         } catch (e) {
-          print('Error parsing offline user: $e');
+          debugPrint('Error parsing offline user: $e');
         }
       } else {
         // Sesi expired
@@ -81,8 +82,21 @@ class AuthViewModel {
       } else {
         errorMessage.value = 'NIM/ID atau password salah';
       }
+    } on SocketException catch (e) {
+      debugPrint('SocketException saat login: $e');
+      errorMessage.value =
+          'Koneksi internet bermasalah. Periksa jaringan lalu coba lagi.';
     } catch (e) {
-      errorMessage.value = 'Gagal terhubung ke server: $e';
+      final message = e.toString();
+      debugPrint('Login error: $message');
+
+      if (message.contains('Failed host lookup') ||
+          message.contains('ClientException with SocketException')) {
+        errorMessage.value =
+            'Tidak bisa menghubungi server. Pastikan internet aktif dan coba lagi.';
+      } else {
+        errorMessage.value = 'Gagal login. Coba lagi dalam beberapa saat.';
+      }
     } finally {
       isLoading.value = false;
     }
