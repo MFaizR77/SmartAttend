@@ -116,8 +116,9 @@ class DatabaseService {
     await connect();
     final hari = getHariIni();
     final jadwalCollection = _db!.collection('jadwal_kuliah');
+    final pengajuanCollection = _db!.collection('pengajuan_ganti_jadwal');
     
-    try {
+    Future<List<Map<String, dynamic>>> fetchJadwal() async {
       final cursor = jadwalCollection.find({
         '\$or': [
           {'kodeDosen': dosenId},
@@ -125,24 +126,47 @@ class DatabaseService {
         ],
         'hari': hari,
       });
-      
-      final List<Map<String, dynamic>> jadwal = await cursor.toList();
-      jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
-      return jadwal;
+      final jadwalReguler = await cursor.toList();
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+      final pengajuanCursor = pengajuanCollection.find({
+        'dosenId': dosenId,
+        'status': 'approved',
+        'tanggalPengganti': {
+          '\$gte': startOfDay.toIso8601String(),
+          '\$lte': endOfDay.toIso8601String(),
+        }
+      });
+      final pengajuan = await pengajuanCursor.toList();
+
+      final List<Map<String, dynamic>> jadwalPengganti = pengajuan.map((p) {
+        return {
+          '_id': p['_id'],
+          'namaMK': p['namaMK'] ?? 'Mata Kuliah',
+          'kelas': p['kelas'] ?? '',
+          'tipe': 'Pengganti',
+          'jamMulai': p['jamMulaiPengganti'] ?? '',
+          'jamSelesai': p['jamSelesaiPengganti'] ?? '',
+          'ruangan': p['ruanganPengganti'] ?? '',
+          'hari': hari,
+        };
+      }).toList();
+
+      final List<Map<String, dynamic>> semuaJadwal = [...jadwalReguler, ...jadwalPengganti];
+      semuaJadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
+      return semuaJadwal;
+    }
+
+    try {
+      return await fetchJadwal();
     } catch (e) {
       if (e.toString().contains('ConnectionException')) {
         _db = null;
         await connect();
-        final cursor = _db!.collection('jadwal_kuliah').find({
-          '\$or': [
-            {'kodeDosen': dosenId},
-            {'dosenId': dosenId}
-          ],
-          'hari': hari,
-        });
-        final List<Map<String, dynamic>> jadwal = await cursor.toList();
-        jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
-        return jadwal;
+        return await fetchJadwal();
       }
       rethrow;
     }

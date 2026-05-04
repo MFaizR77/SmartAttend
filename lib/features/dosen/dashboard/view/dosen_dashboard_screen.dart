@@ -74,8 +74,6 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                 children: [
                   _buildStatistik(),
                   const SizedBox(height: 24),
-                  _buildSectionTitle('Jadwal Mengajar'),
-                  const SizedBox(height: 16),
                   _buildJadwalList(),
                   const SizedBox(height: 34),
                   _buildSectionTitle('Menu Cepat'),
@@ -230,89 +228,116 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
     return ValueListenableBuilder<List<Map<String, String>>>(
       valueListenable: _vm.jadwalMengajar,
       builder: (_, jadwal, child) {
-        if (jadwal.isEmpty) {
-          return Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
-            ),
-            child: const Text(
-              'Tidak ada jadwal mengajar',
-              style: TextStyle(
-                color: AppColors.textSecondary,
-                fontFamily: 'Plus Jakarta Sans',
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          );
-        }
+        final reguler = jadwal.where((j) => j['tipe'] != 'Pengganti').toList();
+        final pengganti = jadwal.where((j) => j['tipe'] == 'Pengganti').toList();
+
         return Column(
-          children: jadwal.map((j) => Padding(
-            padding: const EdgeInsets.only(bottom: 12),
-            child: Material(
-              color: Colors.transparent,
-              child: InkWell(
-                borderRadius: BorderRadius.circular(16),
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => SesiDosenScreen(user: widget.user, jadwal: j),
-                    ),
-                  );
-                },
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(color: AppColors.border),
-                    boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Jadwal Mengajar selalu ditampilkan
+            _buildSectionTitle('Jadwal Mengajar'),
+            const SizedBox(height: 16),
+            if (reguler.isEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(color: AppColors.border),
+                ),
+                child: const Text(
+                  'Tidak ada jadwal mengajar hari ini',
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
                   ),
-                  child: Row(
+                ),
+              )
+            else
+              ...reguler.map((j) => _buildJadwalCard(j, isPengganti: false)),
+
+            // Kuliah Pengganti hanya muncul jika ada
+            if (pengganti.isNotEmpty) ...[
+              const SizedBox(height: 24),
+              _buildSectionTitle('Kuliah Pengganti'),
+              const SizedBox(height: 16),
+              ...pengganti.map((j) => _buildJadwalCard(j, isPengganti: true)),
+            ],
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildJadwalCard(Map<String, String> j, {bool isPengganti = false}) {
+    final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
+    final iconBgColor = isPengganti ? Colors.blue.shade100 : AppColors.brand.withValues(alpha: 0.2);
+    final iconColor = isPengganti ? Colors.blue.shade700 : AppColors.primary;
+    final textColor = isPengganti ? Colors.blue.shade800 : AppColors.primary;
+    final borderColor = isPengganti ? Colors.blue.shade200 : AppColors.border;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => SesiDosenScreen(user: widget.user, jadwal: j),
+              ),
+            );
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: cardColor,
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: borderColor),
+              boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: iconBgColor,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(isPengganti ? Icons.swap_horiz_rounded : Icons.class_outlined, color: iconColor, size: 24),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: AppColors.brand.withValues(alpha: 0.2),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: const Icon(Icons.class_outlined, color: AppColors.primary, size: 24),
+                      Text(
+                        j['mataKuliah'] ?? '-',
+                        maxLines: 1, overflow: TextOverflow.ellipsis,
+                        style: TextStyle(color: textColor, fontFamily: 'Plus Jakarta Sans', fontSize: 15, fontWeight: FontWeight.w700, height: 1.4),
                       ),
-                      const SizedBox(width: 14),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              j['mataKuliah'] ?? '-',
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: AppColors.primary, fontFamily: 'Plus Jakarta Sans', fontSize: 15, fontWeight: FontWeight.w700, height: 1.4),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '${j['jam']} • ${j['ruang']}',
-                              style: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w500, height: 1.3),
-                            ),
-                          ],
-                        ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${j['jam']} • ${j['ruang']}',
+                        style: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w500, height: 1.3),
                       ),
-                      const SizedBox(width: 8),
-                      const Icon(Icons.chevron_right_rounded, color: AppColors.primary, size: 22),
                     ],
                   ),
                 ),
-              ),
+                const SizedBox(width: 8),
+                Icon(Icons.chevron_right_rounded, color: textColor, size: 22),
+              ],
             ),
-          )).toList(),
-        );
-      },
+          ),
+        ),
+      ),
     );
   }
 
