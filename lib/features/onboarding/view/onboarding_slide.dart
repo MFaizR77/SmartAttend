@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'onboarding_screen.dart';
 
 /// Widget satu slide onboarding.
@@ -18,7 +19,7 @@ class OnboardingSlide extends StatelessWidget {
         Expanded(
           child: Container(
             width: double.infinity,
-            color: const Color(0xFFF3F7F8),
+            color: AppColors.onboardingBackground,
             child: Stack(
               children: [
                 // Latar gradien hijau tipis
@@ -30,11 +31,14 @@ class OnboardingSlide extends StatelessWidget {
                     opacity: 0.60,
                     child: Container(
                       height: 420,
-                      decoration: const ShapeDecoration(
+                      decoration: ShapeDecoration(
                         gradient: LinearGradient(
-                          begin: Alignment(0.50, 0.00),
-                          end: Alignment(0.50, 1.00),
-                          colors: [Color(0x7FD9EDDB), Color(0x00D9EDDB)],
+                          begin: const Alignment(0.50, 0.00),
+                          end: const Alignment(0.50, 1.00),
+                          colors: [
+                            AppColors.primaryBlue.withValues(alpha: 0.5),
+                            AppColors.primaryBlue.withValues(alpha: 0.0),
+                          ],
                         ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.only(
@@ -57,7 +61,7 @@ class OnboardingSlide extends StatelessWidget {
         // ── Area teks (judul + deskripsi) ────────────────────────────────
         Container(
           width: double.infinity,
-          color: const Color(0xFFF3F7F8),
+          color: AppColors.onboardingBackground,
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -90,7 +94,7 @@ class OnboardingSlide extends StatelessWidget {
                   data.description,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Color(0xFF414941),
+                    color: AppColors.grayDeep,
                     fontSize: 16,
                     fontFamily: 'Inter',
                     fontWeight: FontWeight.w400,
@@ -109,7 +113,7 @@ class OnboardingSlide extends StatelessWidget {
 }
 
 // ────────────────────────────────────────────────────────────────────────────
-/// Area ilustrasi: lingkaran latar kuning-hijau + gambar onboarding.
+/// Area ilustrasi
 // ────────────────────────────────────────────────────────────────────────────
 class _IllustrationArea extends StatelessWidget {
   final String imagePath;
@@ -124,18 +128,6 @@ class _IllustrationArea extends StatelessWidget {
       child: Stack(
         alignment: Alignment.center,
         children: [
-          // Lingkaran besar kuning-hijau (latar)
-          Container(
-            width: 320,
-            height: 320,
-            decoration: const ShapeDecoration(
-              color: Color(0x4CD4FF00),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.all(Radius.circular(9999)),
-              ),
-            ),
-          ),
-
           // Gambar onboarding
           Image.asset(imagePath, width: 280, height: 280, fit: BoxFit.contain),
         ],

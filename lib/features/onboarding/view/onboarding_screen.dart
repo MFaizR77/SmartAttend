@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_colors.dart';
 import 'onboarding_slide.dart';
 
 /// Layar onboarding utama — mengelola 3 slide dengan PageView.
@@ -78,8 +79,8 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
               height: 8,
               decoration: BoxDecoration(
                 color: Color.lerp(
-                  const Color(0xFFC4C7C5),
-                  const Color(0xFF1B1B19),
+                  AppColors.onboardingDotInactive,
+                  AppColors.charcoal,
                   selected,
                 ),
                 borderRadius: BorderRadius.circular(9999),
@@ -103,7 +104,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
         width: double.infinity,
         padding: const EdgeInsets.symmetric(vertical: 14),
         decoration: ShapeDecoration(
-          color: const Color(0xFFD4FF00),
+          color: AppColors.primaryBlue,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(9999),
           ),
@@ -142,7 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             key: ValueKey<bool>(isLast),
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: Color(0xFF1B1B19),
+              color: AppColors.charcoal,
               fontSize: 20,
               fontFamily: 'Inter',
               fontWeight: FontWeight.w500,
@@ -157,7 +158,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF3F7F8),
+      backgroundColor: AppColors.onboardingBackground,
       body: SafeArea(
         child: Column(
           children: [

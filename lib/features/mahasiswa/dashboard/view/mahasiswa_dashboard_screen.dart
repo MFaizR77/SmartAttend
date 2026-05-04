@@ -10,6 +10,7 @@ import 'dart:async';
 import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../../auth/view/widgets/logout_confirm_dialog.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -33,12 +34,6 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   int _currentNavIndex = 0;
   Timer? _pollingTimer;
   final Set<String> _notifiedJadwalIds = {};
-
-  static const Color _ink = Color(0xFF1A1A1A);
-  static const Color _softText = Color(0xFF6B7280);
-  static const Color _surface = Color(0xFFF8F8F8);
-  static const Color _stroke = Color(0xFFF3F4F6);
-  static const Color _brand = Color(0xFFD0FF00);
 
   @override
   void initState() {
@@ -128,7 +123,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             _buildTopHeader(),
             Expanded(
               child: Container(
-                color: _surface,
+                color: AppColors.dashboardSurface,
                 child: SingleChildScrollView(
                   padding: EdgeInsets.fromLTRB(
                     24,
@@ -185,22 +180,22 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Widget _buildTopHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
-      decoration: const BoxDecoration(
-        color: _brand,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      decoration: BoxDecoration(
+        color: AppColors.primaryBlue,
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   'Halo,\n${widget.user.nama}!',
                   style: const TextStyle(
-                    color: _ink,
+                    color: AppColors.surface,
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -208,55 +203,72 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     letterSpacing: -0.6,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _ink,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    widget.user.roleLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
+              ),
               IconButton(
-                onPressed: widget.onLogout,
+                onPressed: () {
+                  showDialog(
+                    context: context,
+                    builder: (context) =>
+                        LogoutConfirmDialog(onConfirm: widget.onLogout),
+                  );
+                },
                 splashRadius: 22,
-                icon: const Icon(Icons.logout_rounded, color: _ink, size: 26),
+                icon: const Icon(
+                  Icons.logout_rounded,
+                  color: AppColors.surface,
+                  size: 26,
+                ),
                 tooltip: 'Logout',
               ),
-              const SizedBox(height: 34),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
+                ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.24),
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  widget.user.roleLabel,
+                  style: const TextStyle(
+                    color: AppColors.grayDark,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                  decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.24),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _ink, width: 1),
+                  border: Border.all(color: AppColors.surface, width: 1),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.wifi_off_rounded, color: _ink, size: 16),
+                    Icon(
+                      Icons.wifi_off_rounded,
+                      color: AppColors.surface,
+                      size: 16,
+                    ),
                     SizedBox(width: 8),
                     Text(
                       'Offline',
                       style: TextStyle(
-                        color: _ink,
+                        color: AppColors.surface,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -299,7 +311,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _ink, width: 2),
+          border: Border.all(color: AppColors.grayDark, width: 2),
           boxShadow: const [
             BoxShadow(
               color: Color(0x19000000),
@@ -316,7 +328,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
               Text(
                 value,
                 style: const TextStyle(
-                  color: _ink,
+                  color: AppColors.grayDark,
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 50,
                   fontWeight: FontWeight.w800,
@@ -345,7 +357,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     return Text(
       title,
       style: const TextStyle(
-        color: _ink,
+        color: AppColors.grayDark,
         fontFamily: 'Plus Jakarta Sans',
         fontSize: 36,
         fontWeight: FontWeight.w800,
@@ -365,12 +377,12 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _stroke),
+              border: Border.all(color: AppColors.stroke),
             ),
             child: const Text(
               'Tidak ada jadwal hari ini',
               style: TextStyle(
-                color: _softText,
+                color: AppColors.softText,
                 fontFamily: 'Plus Jakarta Sans',
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -393,7 +405,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
 
   Widget _buildJadwalCard(Map<String, String> jadwal, {bool isPengganti = false}) {
     final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
-    final iconColor = isPengganti ? Colors.blue : _ink;
+    final iconColor = isPengganti ? Colors.blue : AppColors.grayDark;
     final iconBgColor = isPengganti ? Colors.blue.shade100 : const Color(0x33D0FF00);
     return Material(
       color: Colors.transparent,
@@ -403,10 +415,8 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           Navigator.push(
             context,
             MaterialPageRoute(
-              builder: (context) => PresensiScreen(
-                jadwal: jadwal,
-                user: widget.user,
-              ),
+              builder: (context) =>
+                  PresensiScreen(jadwal: jadwal, user: widget.user),
             ),
           );
         },
@@ -416,7 +426,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _stroke),
+            border: Border.all(color: AppColors.stroke),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0C000000),
@@ -434,8 +444,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   color: iconBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child:
-                    Icon(Icons.computer_outlined, color: iconColor, size: 24),
+                child: Icon(Icons.computer_outlined, color: iconColor, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -447,7 +456,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: _ink,
+                        color: AppColors.grayDark,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -458,7 +467,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     Text(
                       '${jadwal['jam'] ?? '-'} • ${jadwal['ruang'] ?? '-'}',
                       style: const TextStyle(
-                        color: _softText,
+                        color: AppColors.softText,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -469,7 +478,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: _ink, size: 22),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.grayDark,
+                size: 22,
+              ),
             ],
           ),
         ),
@@ -509,7 +522,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: _stroke),
+                        border: Border.all(color: AppColors.stroke),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x0C000000),
@@ -520,7 +533,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       ),
                       child: Icon(
                         menu['icon'] as IconData,
-                        color: _ink,
+                        color: AppColors.grayDark,
                         size: 30,
                       ),
                     ),
@@ -554,9 +567,9 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(24, 14, 24, 14 + bottomInset),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: _stroke)),
+        border: Border(top: BorderSide(color: AppColors.stroke)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -574,16 +587,17 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     Icon(
                       items[i]['icon'] as IconData,
                       size: 24,
-                      color:
-                          _currentNavIndex == i ? _brand : const Color(0xFF9CA3AF),
+                      color: _currentNavIndex == i
+                          ? AppColors.primaryBlue
+                          : AppColors.grayLight,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       items[i]['label'] as String,
                       style: TextStyle(
                         color: _currentNavIndex == i
-                            ? _brand
-                            : const Color(0xFF9CA3AF),
+                            ? AppColors.primaryBlue
+                            : AppColors.grayLight,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
