@@ -14,7 +14,10 @@ class DosenDashboardViewModel {
   final ValueNotifier<int> totalMahasiswa = ValueNotifier(0);
   final ValueNotifier<int> izinPending = ValueNotifier(0);
 
+  bool _isDisposed = false;
+
   Future<void> loadData(User user) async {
+    if (_isDisposed) return;
     mahasiswaHadir.value = DummyData.mahasiswaHadirHariIni;
     totalMahasiswa.value = DummyData.totalMahasiswaKelas;
     izinPending.value = DummyData.pengajuanIzinPending;
@@ -32,6 +35,7 @@ class DosenDashboardViewModel {
         };
       }).toList();
 
+      if (_isDisposed) return;
       jadwalMengajar.value = mappedJadwal;
       
       // Cache jadwal ke Hive untuk mode offline (berbasis hari)
@@ -53,6 +57,7 @@ class DosenDashboardViewModel {
         if (cachedDataStr != null) {
           try {
             final List<dynamic> decoded = jsonDecode(cachedDataStr);
+            if (_isDisposed) return;
             jadwalMengajar.value = decoded.map((e) => Map<String, String>.from(e)).toList();
             print('=== DEBUG: Berhasil meload jadwal dosen offline dari Hive ===');
           } catch (err) {
@@ -66,6 +71,7 @@ class DosenDashboardViewModel {
   }
 
   void dispose() {
+    _isDisposed = true;
     jadwalMengajar.dispose();
     mahasiswaHadir.dispose();
     totalMahasiswa.dispose();
