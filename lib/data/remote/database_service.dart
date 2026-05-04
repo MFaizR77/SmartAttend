@@ -111,6 +111,27 @@ class DatabaseService {
     return jadwal;
   }
 
+  /// Mengambil semua jadwal kuliah seminggu untuk mahasiswa berdasarkan kelas
+  Future<List<Map<String, dynamic>>> getSemuaJadwalMahasiswa(String kelas) async {
+    await connect();
+    final jadwalCollection = _db!.collection('jadwal_kuliah');
+
+    final cursor = jadwalCollection.find({
+      'kelas': kelas,
+      'isActive': true,
+    });
+
+    final List<Map<String, dynamic>> jadwal = await cursor.toList();
+    jadwal.sort((a, b) {
+      const urutan = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      final iA = urutan.indexOf(a['hari'] as String? ?? '');
+      final iB = urutan.indexOf(b['hari'] as String? ?? '');
+      if (iA != iB) return iA.compareTo(iB);
+      return (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? '');
+    });
+    return jadwal;
+  }
+
   /// Mengambil jadwal mengajar hari ini untuk dosen
   Future<List<Map<String, dynamic>>> getJadwalDosen(String dosenId) async {
     await connect();

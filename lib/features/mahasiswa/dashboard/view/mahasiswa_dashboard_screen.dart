@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
-import '../../presensi/view/presensi_screen.dart';
+import '../../presensi/view/absensi_list_screen.dart';
 import '../../jadwal/view/jadwal_screen.dart';
 import '../../rekap/view/rekap_screen.dart';
 import '../../../profil/view/profil_screen.dart';
@@ -106,15 +106,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           children: [
             _buildDashboardContent(bottomInset),
             JadwalScreen(user: widget.user),
-            PresensiScreen(
-              jadwal: const {
-                'mataKuliah': 'Pemrograman Mobile',
-                'jam': '07:30 - 09:10',
-                'ruang': 'Ruang 204',
-                'id': '',
-              },
-              user: widget.user,
-            ),
+            AbsensiListScreen(user: widget.user),
             ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
         ),
@@ -184,15 +176,23 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-      decoration: BoxDecoration(
-        color: AppColors.primaryBlue,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(10)),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [
+            Color(0xFF1A237E),
+            Color(0xFF1E3A8A),
+            Color(0xFF1565C0),
+          ],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Expanded(
                 child: Text(
@@ -207,22 +207,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   ),
                 ),
               ),
-              IconButton(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) =>
-                        LogoutConfirmDialog(onConfirm: widget.onLogout),
-                  );
-                },
-                splashRadius: 22,
-                icon: const Icon(
-                  Icons.logout_rounded,
-                  color: AppColors.surface,
-                  size: 26,
-                ),
-                tooltip: 'Logout',
-              ),
+              _buildAvatar(widget.user.nama),
             ],
           ),
           const SizedBox(height: 20),
@@ -362,9 +347,10 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
       style: const TextStyle(
         color: AppColors.grayDark,
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: 36,
+        fontSize: 20,
         fontWeight: FontWeight.w800,
-        height: 1.1,
+        letterSpacing: -0.5,
+        height: 1.2,
       ),
     );
   }
@@ -411,22 +397,16 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     bool isPengganti = false,
   }) {
     final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
-    final iconColor = isPengganti ? Colors.blue : AppColors.grayDark;
+    final iconColor = isPengganti ? Colors.blue : AppColors.primaryBlue;
     final iconBgColor = isPengganti
         ? Colors.blue.shade100
-        : const Color(0x33D0FF00);
+        : AppColors.primaryBlue.withOpacity(0.2);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) =>
-                  PresensiScreen(jadwal: jadwal, user: widget.user),
-            ),
-          );
+          setState(() => _currentNavIndex = 2);
         },
         child: Container(
           width: double.infinity,
@@ -520,8 +500,21 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 onTap: () {
                   if (menu['label'] == 'Jadwal') {
                     setState(() => _currentNavIndex = 1);
-                  } else if (menu['label'] == 'Rekap') {
+                  } else if (menu['label'] == 'Presensi') {
                     setState(() => _currentNavIndex = 2);
+                  } else if (menu['label'] == 'Rekap') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          backgroundColor: const Color(0xFFF6F6F6),
+                          body: SafeArea(
+                            bottom: false,
+                            child: RekapScreen(user: widget.user),
+                          ),
+                        ),
+                      ),
+                    );
                   } else {
                     _showComingSoon(context);
                   }
@@ -623,6 +616,57 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String name) {
+    final initials = _initials(name);
+    return Container(
+      width: 54,
+      height: 54,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF8003),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3949AB), Color(0xFF1A237E)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return 'U';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    final first = parts[0].substring(0, 1);
+    final second = parts[1].substring(0, 1);
+    return '$first$second'.toUpperCase();
   }
 
   void _showComingSoon(BuildContext context) {

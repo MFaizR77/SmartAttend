@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
+import '../../auth/view/widgets/logout_confirm_dialog.dart';
 
 class ProfilScreen extends StatelessWidget {
   final User user;
@@ -20,25 +22,26 @@ class ProfilScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(24, 20, 24, 22),
             decoration: const BoxDecoration(
               gradient: LinearGradient(
-                begin: Alignment(0.16, -0.45),
-                end: Alignment(0.84, 1.45),
+                begin: Alignment(0.29, -0.41),
+                end: Alignment(0.71, 1.41),
                 colors: [
                   Color(0xFF1A237E),
-                  Color(0xFF283593),
-                  Color(0xFF3949AB),
+                  Color(0xFF1E3A8A),
+                  Color(0xFF1565C0),
                 ],
               ),
               borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
             ),
             child: Text(
               'Profil ${user.roleLabel}',
-              textAlign: TextAlign.center,
+              textAlign: TextAlign.start,
               style: const TextStyle(
                 color: Colors.white,
-                fontSize: 18,
+                fontSize: 28,
                 fontFamily: 'Plus Jakarta Sans',
-                fontWeight: FontWeight.w700,
-                letterSpacing: 0.30,
+                fontWeight: FontWeight.w800,
+                height: 1.1,
+                letterSpacing: -0.6,
               ),
             ),
           ),
@@ -55,7 +58,7 @@ class ProfilScreen extends StatelessWidget {
                     children: [
                       _buildActionRow(
                         icon: Icons.photo_camera_outlined,
-                        iconBg: const Color(0xFFE8EAF6),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Edit Foto Profil',
                         subtitle: 'Ubah foto tampilan profil',
                         onTap: () => _showComingSoon(context),
@@ -63,7 +66,7 @@ class ProfilScreen extends StatelessWidget {
                       _buildDivider(),
                       _buildActionRow(
                         icon: Icons.edit_outlined,
-                        iconBg: const Color(0xFFE3F2FD),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Edit Nama',
                         subtitle: user.nama,
                         onTap: () => _showComingSoon(context),
@@ -71,7 +74,7 @@ class ProfilScreen extends StatelessWidget {
                       _buildDivider(),
                       _buildActionRow(
                         icon: Icons.lock_outline,
-                        iconBg: const Color(0xFFFCE4EC),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Ganti Password',
                         subtitle: 'Terakhir diubah 30 hari lalu',
                         onTap: () => _showComingSoon(context),
@@ -85,7 +88,7 @@ class ProfilScreen extends StatelessWidget {
                     children: [
                       _buildInfoRow(
                         icon: Icons.school_outlined,
-                        iconBg: const Color(0xFFE8F5E9),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Program Studi',
                         subtitle: user.kelas?.isNotEmpty == true
                             ? user.kelas!
@@ -94,14 +97,14 @@ class ProfilScreen extends StatelessWidget {
                       _buildDivider(),
                       _buildInfoRow(
                         icon: Icons.event_note_outlined,
-                        iconBg: const Color(0xFFFFF8E1),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'ID / NIM',
                         subtitle: user.id,
                       ),
                       _buildDivider(),
                       _buildInfoRow(
                         icon: Icons.email_outlined,
-                        iconBg: const Color(0xFFE0F2F1),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Email',
                         subtitle: user.email.isNotEmpty
                             ? user.email
@@ -114,11 +117,17 @@ class ProfilScreen extends StatelessWidget {
                     children: [
                       _buildActionRow(
                         icon: Icons.logout_rounded,
-                        iconBg: const Color(0xFFFBE9E7),
+                        iconBg: AppColors.primaryBlue.withOpacity(0.2),
                         title: 'Keluar',
                         subtitle: 'Akhiri sesi saat ini',
                         titleColor: const Color(0xFFE53935),
-                        onTap: onLogout,
+                        onTap: () {
+                          showDialog(
+                            context: context,
+                            builder: (context) =>
+                                LogoutConfirmDialog(onConfirm: onLogout),
+                          );
+                        },
                       ),
                     ],
                   ),
@@ -392,7 +401,7 @@ class ProfilScreen extends StatelessWidget {
         color: bgColor,
         borderRadius: BorderRadius.circular(12),
       ),
-      child: Icon(icon, size: 20, color: const Color(0xFF3949AB)),
+      child: Icon(icon, size: 20, color: AppColors.primaryBlue),
     );
   }
 

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
+import '../viewmodel/jadwal_viewmodel.dart';
 
 class JadwalScreen extends StatefulWidget {
   final User user;
@@ -12,6 +13,20 @@ class JadwalScreen extends StatefulWidget {
 }
 
 class _JadwalScreenState extends State<JadwalScreen> {
+  final _vm = JadwalViewModel();
+
+  @override
+  void initState() {
+    super.initState();
+    _vm.loadData(widget.user);
+  }
+
+  @override
+  void dispose() {
+    _vm.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -22,77 +37,35 @@ class _JadwalScreenState extends State<JadwalScreen> {
           children: [
             _buildHeader(),
             Expanded(
-              child: SingleChildScrollView(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildScheduleSection(
-                        title: 'Jadwal Hari Ini',
-                        schedules: [
-                          {
-                            'title': 'Pemrograman Mobile',
-                            'time': '07:30 – 09:10',
-                            'room': 'Ruang 204',
-                            'lecturer': 'Dr. Hendra',
-                            'status': 'Selesai',
-                            'statusColor': const Color(0xFFF3F4F6),
-                            'statusTextColor': const Color(0xFF9CA3AF),
-                            'iconBg': const Color(0x213434A2),
-                          },
-                          {
-                            'title': 'Basis Data Lanjut',
-                            'time': '09:30 – 11:10',
-                            'room': 'Lab DB',
-                            'lecturer': 'Ir. Susanto',
-                            'status': 'Berlangsung',
-                            'statusColor': const Color(0xFFDCFCE7),
-                            'statusTextColor': const Color(0xFF16A34A),
-                            'iconBg': const Color(0x1E16A34A),
-                          },
-                          {
-                            'title': 'Rekayasa Perangkat Lunak',
-                            'time': '11:30 – 13:10',
-                            'room': 'Ruang 301',
-                            'lecturer': 'Dr. Kartini',
-                            'status': 'Upcoming',
-                            'statusColor': const Color(0xFFEEF2FF),
-                            'statusTextColor': const Color(0xFF01018B),
-                            'iconBg': const Color(0x213434A2),
-                          },
-                        ],
+              child: ValueListenableBuilder<bool>(
+                valueListenable: _vm.isLoading,
+                builder: (_, isLoading, __) {
+                  if (isLoading) {
+                    return const Center(
+                      child: CircularProgressIndicator(
+                        color: AppColors.primaryBlue,
                       ),
-                      const SizedBox(height: 24),
-                      _buildScheduleSection(
-                        title: 'Besok',
-                        schedules: [
-                          {
-                            'title': 'Pemrograman Mobile',
-                            'time': '09:30 – 11:10',
-                            'room': 'Ruang 204',
-                            'lecturer': 'Dr. Hendra',
-                            'status': 'Upcoming',
-                            'statusColor': const Color(0xFFEEF2FF),
-                            'statusTextColor': const Color(0xFF01018B),
-                            'iconBg': const Color(0x213434A2),
-                          },
-                          {
-                            'title': 'Statistika & Probabilitas',
-                            'time': '13:00 – 14:40',
-                            'room': 'Ruang 105',
-                            'lecturer': 'Dr. Anita',
-                            'status': 'Upcoming',
-                            'statusColor': const Color(0xFFEEF2FF),
-                            'statusTextColor': const Color(0xFF01018B),
-                            'iconBg': const Color(0x213434A2),
-                          },
-                        ],
-                      ),
-                      const SizedBox(height: 40),
-                    ],
-                  ),
-                ),
+                    );
+                  }
+                  return ValueListenableBuilder<String?>(
+                    valueListenable: _vm.errorMessage,
+                    builder: (_, error, __) {
+                      if (error != null) {
+                        return _buildErrorState(error);
+                      }
+                      return ValueListenableBuilder<
+                          Map<String, List<Map<String, dynamic>>>>(
+                        valueListenable: _vm.jadwalPerHari,
+                        builder: (_, jadwalPerHari, __) {
+                          if (jadwalPerHari.isEmpty) {
+                            return _buildEmptyState();
+                          }
+                          return _buildScheduleList(jadwalPerHari);
+                        },
+                      );
+                    },
+                  );
+                },
               ),
             ),
           ],
@@ -106,7 +79,11 @@ class _JadwalScreenState extends State<JadwalScreen> {
       width: double.infinity,
       padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
       decoration: const BoxDecoration(
-        color: Color(0xFF01018B),
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
+        ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
         boxShadow: [
           BoxShadow(
@@ -123,53 +100,25 @@ class _JadwalScreenState extends State<JadwalScreen> {
             'Jadwal',
             style: TextStyle(
               color: Colors.white,
-              fontSize: 24,
+              fontSize: 28,
               fontFamily: 'Plus Jakarta Sans',
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.20,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              letterSpacing: -0.6,
             ),
           ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: const Color(0xFFFF8003),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFFF8003)),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Column(
-                  spacing: 3,
-                  children: [
-                    Container(
-                      width: 14,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 10,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                    Container(
-                      width: 7,
-                      height: 2,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(2),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
+          GestureDetector(
+            onTap: () => _vm.loadData(widget.user),
+            child: Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: Colors.white.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: Colors.white.withOpacity(0.25)),
+              ),
+              child: const Icon(Icons.refresh_rounded,
+                  color: Colors.white, size: 20),
             ),
           ),
         ],
@@ -177,36 +126,94 @@ class _JadwalScreenState extends State<JadwalScreen> {
     );
   }
 
-  Widget _buildScheduleSection({
-    required String title,
-    required List<Map<String, dynamic>> schedules,
-  }) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildScheduleList(Map<String, List<Map<String, dynamic>>> jadwalPerHari) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
+      children: jadwalPerHari.entries.map((entry) {
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildDayHeader(entry.key),
+            const SizedBox(height: 12),
+            ...entry.value.map((jadwal) {
+              final status = _vm.getStatusJadwal(jadwal);
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 12),
+                child: _buildScheduleCard(jadwal, status),
+              );
+            }),
+            const SizedBox(height: 16),
+          ],
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildDayHeader(String hari) {
+    final hariSekarang = _isHariIni(hari);
+    return Row(
       children: [
         Text(
-          title,
-          style: const TextStyle(
-            color: Color(0xFF1A1A1A),
-            fontSize: 18,
+          hari,
+          style: TextStyle(
+            color: hariSekarang
+                ? AppColors.primaryBlue
+                : const Color(0xFF1A1A1A),
+            fontSize: 20,
             fontFamily: 'Plus Jakarta Sans',
             fontWeight: FontWeight.w800,
+            letterSpacing: -0.5,
           ),
         ),
-        const SizedBox(height: 12),
-        ...schedules
-            .map(
-              (schedule) => Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildScheduleCard(schedule),
+        if (hariSekarang) ...[
+          const SizedBox(width: 8),
+          Container(
+            padding:
+                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.primaryBlue.withOpacity(0.12),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              'Hari Ini',
+              style: TextStyle(
+                color: AppColors.primaryBlue,
+                fontSize: 11,
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w700,
               ),
-            )
-            .toList(),
+            ),
+          ),
+        ],
       ],
     );
   }
 
-  Widget _buildScheduleCard(Map<String, dynamic> schedule) {
+  bool _isHariIni(String hari) {
+    final weekday = DateTime.now().weekday;
+    const map = {
+      1: 'Senin',
+      2: 'Selasa',
+      3: 'Rabu',
+      4: 'Kamis',
+      5: 'Jumat',
+      6: 'Sabtu',
+      7: 'Minggu',
+    };
+    return map[weekday] == hari;
+  }
+
+  Widget _buildScheduleCard(
+      Map<String, dynamic> jadwal, Map<String, dynamic> status) {
+    final mataKuliah = jadwal['namaMK']?.toString() ?? '-';
+    final tipe = jadwal['tipe']?.toString() ?? '';
+    final jamMulai = jadwal['jamMulai']?.toString() ?? '-';
+    final jamSelesai = jadwal['jamSelesai']?.toString() ?? '-';
+    final ruangan = jadwal['ruangan']?.toString() ?? '-';
+    final namaDosen = jadwal['namaDosen']?.toString() ??
+        jadwal['dosenId']?.toString() ??
+        '-';
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -227,19 +234,18 @@ class _JadwalScreenState extends State<JadwalScreen> {
             width: 48,
             height: 48,
             decoration: BoxDecoration(
-              color: schedule['iconBg'] as Color,
+              color: AppColors.primaryBlue.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.class_, color: Colors.white, size: 24),
+            child: const Icon(Icons.class_, color: AppColors.primaryBlue, size: 24),
           ),
           const SizedBox(width: 14),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              spacing: 3,
               children: [
                 Text(
-                  schedule['title'] as String,
+                  tipe.isNotEmpty ? '$mataKuliah ($tipe)' : mataKuliah,
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
@@ -249,18 +255,15 @@ class _JadwalScreenState extends State<JadwalScreen> {
                     fontWeight: FontWeight.w700,
                   ),
                 ),
+                const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.access_time,
-                      size: 13,
-                      color: Color(0xFF6B7280),
-                    ),
+                    const Icon(Icons.access_time,
+                        size: 13, color: Color(0xFF6B7280)),
                     const SizedBox(width: 4),
-                    Expanded(
-                      flex: 3,
+                    Flexible(
                       child: Text(
-                        schedule['time'] as String,
+                        '$jamMulai – $jamSelesai',
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -273,24 +276,16 @@ class _JadwalScreenState extends State<JadwalScreen> {
                     ),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '•',
-                        style: TextStyle(
-                          color: Color(0xFFD1D5DB),
-                          fontSize: 12,
-                        ),
-                      ),
+                      child: Text('•',
+                          style: TextStyle(
+                              color: Color(0xFFD1D5DB), fontSize: 12)),
                     ),
-                    const Icon(
-                      Icons.location_on,
-                      size: 13,
-                      color: Color(0xFF6B7280),
-                    ),
+                    const Icon(Icons.location_on,
+                        size: 13, color: Color(0xFF6B7280)),
                     const SizedBox(width: 4),
-                    Expanded(
-                      flex: 2,
+                    Flexible(
                       child: Text(
-                        schedule['room'] as String,
+                        ruangan,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -303,17 +298,15 @@ class _JadwalScreenState extends State<JadwalScreen> {
                     ),
                   ],
                 ),
+                const SizedBox(height: 3),
                 Row(
                   children: [
-                    const Icon(
-                      Icons.person,
-                      size: 13,
-                      color: Color(0xFF9CA3AF),
-                    ),
+                    const Icon(Icons.person,
+                        size: 13, color: Color(0xFF9CA3AF)),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
-                        schedule['lecturer'] as String,
+                        namaDosen,
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -331,15 +324,16 @@ class _JadwalScreenState extends State<JadwalScreen> {
           ),
           const SizedBox(width: 8),
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding:
+                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
-              color: schedule['statusColor'] as Color,
+              color: status['statusColor'] as Color,
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
-              schedule['status'] as String,
+              status['status'] as String,
               style: TextStyle(
-                color: schedule['statusTextColor'] as Color,
+                color: status['statusTextColor'] as Color,
                 fontSize: 10.50,
                 fontFamily: 'Plus Jakarta Sans',
                 fontWeight: FontWeight.w700,
@@ -347,6 +341,84 @@ class _JadwalScreenState extends State<JadwalScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildEmptyState() {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today_outlined,
+              size: 72, color: AppColors.border),
+          const SizedBox(height: 16),
+          const Text(
+            'Tidak ada jadwal ditemukan',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 16,
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'Jadwal untuk kelas Anda belum tersedia',
+            style: TextStyle(
+              color: AppColors.textSecondary,
+              fontSize: 13,
+              fontFamily: 'Plus Jakarta Sans',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildErrorState(String error) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.cloud_off_rounded,
+                size: 72, color: AppColors.textSecondary),
+            const SizedBox(height: 16),
+            const Text(
+              'Gagal memuat jadwal',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 16,
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              error,
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontSize: 12,
+                fontFamily: 'Plus Jakarta Sans',
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton.icon(
+              onPressed: () => _vm.loadData(widget.user),
+              icon: const Icon(Icons.refresh_rounded),
+              label: const Text('Coba Lagi'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primaryBlue,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12)),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
