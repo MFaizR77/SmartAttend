@@ -10,6 +10,7 @@ import 'dart:async';
 import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../../auth/view/widgets/logout_confirm_dialog.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -34,17 +35,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Timer? _pollingTimer;
   final Set<String> _notifiedJadwalIds = {};
 
-  static const Color _ink = Color(0xFF1A1A1A);
-  static const Color _softText = Color(0xFF6B7280);
-  static const Color _surface = Color(0xFFF8F8F8);
-  static const Color _stroke = Color(0xFFF3F4F6);
-  static const Color _brand = Color(0xFFD0FF00);
-
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
-    
+
     // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
     NotificationService().requestPermission();
     _startPolling();
@@ -59,14 +54,14 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
       for (final jadwal in jadwalHariIni) {
         final jadwalId = jadwal['id'] ?? '';
         final namaMK = jadwal['mataKuliah'] ?? 'Kelas';
-        
+
         if (jadwalId.isEmpty || _notifiedJadwalIds.contains(jadwalId)) continue;
-        
+
         try {
           final isBuka = await DatabaseService().isKelasBerjalan(jadwalId);
           if (isBuka && mounted) {
             _notifiedJadwalIds.add(jadwalId);
-            
+
             // Tampilkan Notifikasi
             await NotificationService().flutterLocalNotificationsPlugin.show(
               jadwalId.hashCode,
@@ -111,7 +106,15 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           children: [
             _buildDashboardContent(bottomInset),
             JadwalScreen(user: widget.user),
-            RekapScreen(user: widget.user),
+            PresensiScreen(
+              jadwal: const {
+                'mataKuliah': 'Pemrograman Mobile',
+                'jam': '07:30 - 09:10',
+                'ruang': 'Ruang 204',
+                'id': '',
+              },
+              user: widget.user,
+            ),
             ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
         ),
@@ -128,14 +131,9 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             _buildTopHeader(),
             Expanded(
               child: Container(
-                color: _surface,
+                color: AppColors.dashboardSurface,
                 child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    24,
-                    24,
-                    124 + bottomInset,
-                  ),
+                  padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -257,7 +255,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.24),
+                  color: Colors.white.withOpacity(0.24),
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.surface, width: 1),
                 ),
@@ -408,10 +406,15 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     );
   }
 
-  Widget _buildJadwalCard(Map<String, String> jadwal, {bool isPengganti = false}) {
+  Widget _buildJadwalCard(
+    Map<String, String> jadwal, {
+    bool isPengganti = false,
+  }) {
     final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
-    final iconColor = isPengganti ? Colors.blue : _ink;
-    final iconBgColor = isPengganti ? Colors.blue.shade100 : const Color(0x33D0FF00);
+    final iconColor = isPengganti ? Colors.blue : AppColors.grayDark;
+    final iconBgColor = isPengganti
+        ? Colors.blue.shade100
+        : const Color(0x33D0FF00);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -449,9 +452,9 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   color: iconBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.computer_outlined,
-                  color: AppColors.grayDark,
+                  color: iconColor,
                   size: 24,
                 ),
               ),
@@ -631,4 +634,3 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     );
   }
 }
-

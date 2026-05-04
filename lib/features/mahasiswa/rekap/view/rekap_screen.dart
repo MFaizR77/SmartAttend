@@ -15,13 +15,13 @@ class RekapScreen extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           decoration: const BoxDecoration(
-            color: AppColors.brand,
+            color: AppColors.primaryBlue,
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
           ),
           child: const Text(
             'Rekap\nKehadiran',
             style: TextStyle(
-              color: AppColors.primary,
+              color: AppColors.surface,
               fontFamily: 'Plus Jakarta Sans',
               fontWeight: FontWeight.w800,
               height: 1.1,
@@ -39,7 +39,10 @@ class RekapScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 const Text(
                   'Rekap belum tersedia',
-                  style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                  style: TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 16,
+                  ),
                 ),
               ],
             ),

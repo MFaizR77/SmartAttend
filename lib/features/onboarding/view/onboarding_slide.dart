@@ -32,14 +32,6 @@ class OnboardingSlide extends StatelessWidget {
                     child: Container(
                       height: 420,
                       decoration: ShapeDecoration(
-                        gradient: LinearGradient(
-                          begin: const Alignment(0.50, 0.00),
-                          end: const Alignment(0.50, 1.00),
-                          colors: [
-                            AppColors.primaryBlue.withValues(alpha: 0.5),
-                            AppColors.primaryBlue.withValues(alpha: 0.0),
-                          ],
-                        ),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.only(
                             bottomLeft: Radius.circular(60),

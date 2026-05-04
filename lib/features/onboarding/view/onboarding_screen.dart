@@ -110,7 +110,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
           ),
           shadows: const [
             BoxShadow(
-              color: Color(0x263D6846),
+              color: AppColors.surface,
               blurRadius: 30,
               offset: Offset(0, 10),
               spreadRadius: 0,

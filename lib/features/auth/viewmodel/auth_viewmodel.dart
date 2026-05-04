@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
 import '../../../data/local/models/user.dart';
 import '../../../data/remote/database_service.dart';
 import '../../../data/local/hive_helper.dart';
@@ -32,7 +33,7 @@ class AuthViewModel {
           currentUser.value = User.fromMap(userMap);
           return true;
         } catch (e) {
-          print('Error parsing offline user: $e');
+          debugPrint('Error parsing offline user: $e');
         }
       } else {
         // Sesi expired
@@ -99,12 +100,19 @@ class AuthViewModel {
       } else {
         errorMessage.value = 'Username atau password salah';
       }
+    } on SocketException catch (e) {
+      debugPrint('SocketException saat login: $e');
+      errorMessage.value =
+          'Koneksi internet bermasalah. Periksa jaringan lalu coba lagi.';
     } catch (e) {
       // Jika gagal connect ke server (offline), coba validasi dengan data lokal di Hive
-      final isNetworkError =
-          e.toString().contains('SocketException') ||
-          e.toString().contains('ConnectionException') ||
-          e.toString().contains('HandshakeException');
+      final message = e.toString();
+      debugPrint('Login error: $message');
+      final isNetworkError = message.contains('SocketException') ||
+          message.contains('ConnectionException') ||
+          message.contains('HandshakeException') ||
+          message.contains('Failed host lookup') ||
+          message.contains('ClientException');
 
       if (isNetworkError) {
         final userBox = HiveHelper.userBoxInstance;
@@ -123,11 +131,10 @@ class AuthViewModel {
 
             // Pengecekan kredensial lokal
             final isIdentifierMatch =
-                localUser.id == identifier.trim() ||
-                localUser.email == identifier.trim();
-            final isPasswordMatch =
-                localUser.passwordHash ==
-                password; // asumsikan passwordHash di lokal nyimpan password / hash yg sama
+              localUser.id == identifier.trim() ||
+              localUser.email == identifier.trim();
+            // Asumsi passwordHash lokal menyimpan nilai yang bisa dicocokkan saat offline.
+            final isPasswordMatch = localUser.passwordHash == password;
 
             if (isIdentifierMatch && isPasswordMatch) {
               final expiryDate = DateTime.tryParse(expiryStr.toString());
@@ -152,7 +159,7 @@ class AuthViewModel {
               'Anda sedang offline dan belum pernah login sebelumnya di perangkat ini.';
         }
       } else {
-        errorMessage.value = 'Terjadi kesalahan: $e';
+        errorMessage.value = 'Gagal login. Coba lagi dalam beberapa saat.';
       }
     } finally {
       isLoading.value = false;
