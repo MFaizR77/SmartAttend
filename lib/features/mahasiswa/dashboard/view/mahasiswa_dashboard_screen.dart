@@ -106,7 +106,10 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           children: [
             _buildDashboardContent(bottomInset),
             JadwalScreen(user: widget.user),
-            RekapScreen(user: widget.user),
+            PresensiScreen(
+              jadwal: const {'mataKuliah': 'Pemrograman Mobile', 'jam': '07:30 - 09:10', 'ruang': 'Ruang 204', 'id': ''},
+              user: widget.user,
+            ),
             ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
         ),
