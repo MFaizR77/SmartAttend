@@ -94,10 +94,11 @@ class DatabaseService {
     final hari = getHariIni();
     final jadwalCollection = _db!.collection('jadwal_kuliah');
     
-    final cursor = jadwalCollection.find(where
-      .eq('kelas', kelas)
-      .eq('hari', hari)
-    );
+    final cursor = jadwalCollection.find({
+      'kelas': kelas,
+      'hari': hari,
+      'isActive': true,
+    });
     
     final List<Map<String, dynamic>> jadwal = await cursor.toList();
     jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
@@ -111,10 +112,11 @@ class DatabaseService {
     final jadwalCollection = _db!.collection('jadwal_kuliah');
     
     try {
-      final cursor = jadwalCollection.find(where
-        .eq('hari', hari)
-        .and(where.eq('kodeDosen', dosenId).or(where.eq('dosenId', dosenId)))
-      );
+      final cursor = jadwalCollection.find({
+        'dosenId': dosenId,
+        'hari': hari,
+        'isActive': true,
+      });
       
       final List<Map<String, dynamic>> jadwal = await cursor.toList();
       jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
@@ -123,66 +125,17 @@ class DatabaseService {
       if (e.toString().contains('ConnectionException')) {
         _db = null;
         await connect();
-        final cursor = _db!.collection('jadwal_kuliah').find(where
-          .eq('hari', hari)
-          .and(where.eq('kodeDosen', dosenId).or(where.eq('dosenId', dosenId)))
-        );
+        final cursor = _db!.collection('jadwal_kuliah').find({
+          'dosenId': dosenId,
+          'hari': hari,
+          'isActive': true,
+        });
         final List<Map<String, dynamic>> jadwal = await cursor.toList();
         jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
         return jadwal;
       }
       rethrow;
     }
-  }
-
-  /// Mengambil semua jadwal mengajar dosen (semua hari)
-  Future<List<Map<String, dynamic>>> getSemuaJadwalDosen(String dosenId) async {
-    await connect();
-    final jadwalCollection = _db!.collection('jadwal_kuliah');
-    
-    try {
-      final cursor = jadwalCollection.find({
-        r'$or': [
-          {'kodeDosen': dosenId},
-          {'dosenId': dosenId},
-        ]
-      });
-      
-      final List<Map<String, dynamic>> jadwal = await cursor.toList();
-      // Urutkan berdasarkan hari, lalu jam mulai
-      final hariOrder = {'Senin': 1, 'Selasa': 2, 'Rabu': 3, 'Kamis': 4, 'Jumat': 5, 'Sabtu': 6, 'Minggu': 7};
-      jadwal.sort((a, b) {
-        final hariA = hariOrder[a['hari']] ?? 99;
-        final hariB = hariOrder[b['hari']] ?? 99;
-        if (hariA != hariB) return hariA.compareTo(hariB);
-        return (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? '');
-      });
-      return jadwal;
-    } catch (e) {
-      if (e.toString().contains('ConnectionException')) {
-        _db = null;
-        await connect();
-        final cursor = _db!.collection('jadwal_kuliah').find({
-          r'$or': [
-            {'kodeDosen': dosenId},
-            {'dosenId': dosenId},
-          ]
-        });
-        final List<Map<String, dynamic>> jadwal = await cursor.toList();
-        return jadwal;
-      }
-      rethrow;
-    }
-  }
-
-
-
-  /// Mengambil seluruh rekapan laporan dosen
-  Future<List<Map<String, dynamic>>> getSemuaLaporanDosen(String dosenId) async {
-    await connect();
-    final collection = _db!.collection('laporan_dosen');
-    final cursor = collection.find(where.eq('dosenId', dosenId).sortBy('waktuMulai', descending: true));
-    return await cursor.toList();
   }
 
   /// Menyimpan data presensi langsung ke MongoDB (ketika online)
@@ -295,101 +248,6 @@ class DatabaseService {
       }
       record['createdAt'] = DateTime.now();
       await collection.insertOne(record);
-    }
-  }
-
-  /// Mendapatkan daftar semua ruangan yang ada di jadwal
-  Future<List<String>> getSemuaRuangan() async {
-    try {
-      await connect();
-      if (_db == null) {
-        print('DEBUG getSemuaRuangan: _db is null setelah connect()');
-        return [];
-      }
-      final collection = _db!.collection('jadwal_kuliah');
-      final jadwals = await collection.find().toList();
-      print('DEBUG getSemuaRuangan: Ditemukan \${jadwals.length} jadwal total');
-      final Set<String> ruanganSet = {};
-      for (var j in jadwals) {
-        if (j['ruangan'] != null && j['ruangan'].toString().trim().isNotEmpty) {
-          ruanganSet.add(j['ruangan'].toString().trim());
-        }
-      }
-      final result = ruanganSet.toList();
-      result.sort();
-      print('DEBUG getSemuaRuangan: Ditemukan \${result.length} ruangan unik (\${result})');
-      return result;
-    } catch (e) {
-      print('DEBUG getSemuaRuangan ERROR: \$e');
-      return [];
-    }
-  }
-
-  /// Mencari ruangan kosong pada hari dan jam tertentu
-  Future<List<String>> cariRuangKosong(String hari, String jamMulai, String jamSelesai, {String? abaikanJadwalId}) async {
-    print('DEBUG cariRuangKosong: Mulai mencari hari=$hari, jamMulai=$jamMulai, jamSelesai=$jamSelesai');
-    try {
-      await connect();
-      if (_db == null) {
-        print('DEBUG cariRuangKosong: _db is null');
-        return [];
-      }
-      
-      // 1. Dapatkan semua ruangan
-      final semuaRuangan = await getSemuaRuangan();
-      if (semuaRuangan.isEmpty) {
-        print('DEBUG cariRuangKosong: Semua ruangan kosong, batalkan pencarian.');
-        return [];
-      }
-      
-      // 2. Ambil jadwal pada hari tersebut
-      final collection = _db!.collection('jadwal_kuliah');
-      final jadwalHariIni = await collection.find({'hari': hari}).toList();
-      print('DEBUG cariRuangKosong: Ditemukan \${jadwalHariIni.length} jadwal pada hari \$hari');
-      
-      // 3. Filter ruangan yang terpakai
-      final Set<String> ruanganTerpakai = {};
-      
-      // Helper: Konversi jam string ke menit (HH:mm -> menit)
-      int timeToMinutes(String time) {
-        try {
-          time = time.replaceAll('.', ':');
-          final parts = time.split(':');
-          if (parts.length != 2) return 0;
-          return int.parse(parts[0].trim()) * 60 + int.parse(parts[1].trim());
-        } catch (e) {
-          print('Error parse time: \$time');
-          return 0;
-        }
-      }
-      
-      final int reqStart = timeToMinutes(jamMulai);
-      final int reqEnd = timeToMinutes(jamSelesai);
-      
-      for (var j in jadwalHariIni) {
-        // Abaikan jadwal yang sedang ingin diganti agar tidak dianggap bentrok dengan dirinya sendiri
-        if (abaikanJadwalId != null && j['_id'].toString() == abaikanJadwalId) continue;
-        
-        if (j['ruangan'] == null || j['jamMulai'] == null || j['jamSelesai'] == null) continue;
-        
-        final int jStart = timeToMinutes(j['jamMulai'].toString());
-        final int jEnd = timeToMinutes(j['jamSelesai'].toString());
-        
-        // Cek overlap
-        if (jStart < reqEnd && jEnd > reqStart) {
-          ruanganTerpakai.add(j['ruangan'].toString().trim());
-        }
-      }
-      print('DEBUG cariRuangKosong: Ruangan terpakai = \$ruanganTerpakai');
-      
-      // 4. Hapus ruangan yang terpakai dari semua ruangan
-      final ruanganKosong = semuaRuangan.where((r) => !ruanganTerpakai.contains(r)).toList();
-      print('DEBUG cariRuangKosong: Ruangan kosong = \$ruanganKosong');
-      
-      return ruanganKosong;
-    } catch (e) {
-      print('DEBUG cariRuangKosong ERROR: \$e');
-      return [];
     }
   }
 
