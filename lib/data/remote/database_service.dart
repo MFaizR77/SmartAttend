@@ -414,6 +414,62 @@ class DatabaseService {
     return hasil;
   }
 
+  /// Mengambil rincian pemakaian suatu ruangan pada tanggal tertentu
+  Future<List<Map<String, dynamic>>> getDetailJadwalRuangan(DateTime tanggal, String ruangan) async {
+    await connect();
+    
+    final hari = getHariFromDate(tanggal);
+    final jadwalCollection = _db!.collection('jadwal_kuliah');
+    
+    // 1. Jadwal reguler (match nama ruangan persis di awal, karena kadang ada - Gedung C)
+    final regulerTerpakai = await jadwalCollection.find({
+      'hari': hari,
+      'ruangan': {'\$regex': '^$ruangan'},
+    }).toList();
+
+    // 2. Jadwal pengganti
+    final startOfDay = DateTime(tanggal.year, tanggal.month, tanggal.day);
+    final endOfDay = DateTime(tanggal.year, tanggal.month, tanggal.day, 23, 59, 59);
+    
+    final pengajuanCollection = _db!.collection('pengajuan_ganti_jadwal');
+    final pengajuanTerpakai = await pengajuanCollection.find({
+      'tanggalPengganti': {
+        '\$gte': startOfDay.toIso8601String(),
+        '\$lte': endOfDay.toIso8601String(),
+      },
+      'status': {'\$in': ['pending', 'approved']},
+      'ruanganPengganti': {'\$regex': '^$ruangan'},
+    }).toList();
+
+    // 3. Gabungkan hasil
+    final List<Map<String, dynamic>> detailJadwal = [];
+    
+    for (var j in regulerTerpakai) {
+      detailJadwal.add({
+        'jamMulai': j['jamMulai'] ?? '',
+        'jamSelesai': j['jamSelesai'] ?? '',
+        'namaMK': j['namaMK'] ?? j['mataKuliah'] ?? 'Mata Kuliah',
+        'kelas': j['kelas'] ?? '',
+        'jenis': 'Reguler',
+      });
+    }
+
+    for (var p in pengajuanTerpakai) {
+      detailJadwal.add({
+        'jamMulai': p['jamMulaiPengganti'] ?? '',
+        'jamSelesai': p['jamSelesaiPengganti'] ?? '',
+        'namaMK': p['namaMK'] ?? 'Mata Kuliah',
+        'kelas': p['kelas'] ?? '',
+        'jenis': 'Pengganti',
+      });
+    }
+
+    // Urutkan berdasarkan jamMulai
+    detailJadwal.sort((a, b) => (a['jamMulai'] as String).compareTo(b['jamMulai'] as String));
+    
+    return detailJadwal;
+  }
+
   /// Menyimpan pengajuan ganti jadwal dengan status pending
   Future<void> ajukanGantiJadwal(Map<String, dynamic> data) async {
     await connect();
