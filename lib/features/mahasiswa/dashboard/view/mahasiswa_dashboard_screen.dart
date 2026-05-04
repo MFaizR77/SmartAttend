@@ -1,7 +1,15 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
 import '../../presensi/view/presensi_screen.dart';
+import '../../jadwal/view/jadwal_screen.dart';
+import '../../rekap/view/rekap_screen.dart';
+import '../../../profil/view/profil_screen.dart';
+import 'dart:async';
+import '../../../../data/remote/database_service.dart';
+import '../../../../core/services/notification_service.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -23,6 +31,8 @@ class MahasiswaDashboardScreen extends StatefulWidget {
 class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   final _vm = MahasiswaDashboardViewModel();
   int _currentNavIndex = 0;
+  Timer? _pollingTimer;
+  final Set<String> _notifiedJadwalIds = {};
 
   static const Color _ink = Color(0xFF1A1A1A);
   static const Color _softText = Color(0xFF6B7280);
@@ -34,10 +44,56 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
+    
+    // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
+    NotificationService().requestPermission();
+    _startPolling();
+  }
+
+  void _startPolling() {
+    _pollingTimer = Timer.periodic(const Duration(seconds: 15), (timer) async {
+      if (!mounted) return;
+      final jadwalHariIni = _vm.jadwalHariIni.value;
+      if (jadwalHariIni.isEmpty) return;
+
+      for (final jadwal in jadwalHariIni) {
+        final jadwalId = jadwal['id'] ?? '';
+        final namaMK = jadwal['mataKuliah'] ?? 'Kelas';
+        
+        if (jadwalId.isEmpty || _notifiedJadwalIds.contains(jadwalId)) continue;
+        
+        try {
+          final isBuka = await DatabaseService().isKelasBerjalan(jadwalId);
+          if (isBuka && mounted) {
+            _notifiedJadwalIds.add(jadwalId);
+            
+            // Tampilkan Notifikasi
+            await NotificationService().flutterLocalNotificationsPlugin.show(
+              jadwalId.hashCode,
+              'Absensi Terbuka!',
+              'Absensi untuk kelas $namaMK sudah dibuka oleh dosen.',
+              const NotificationDetails(
+                android: AndroidNotificationDetails(
+                  'mahasiswa_channel',
+                  'Notifikasi Mahasiswa',
+                  channelDescription: 'Notifikasi absensi untuk mahasiswa',
+                  importance: Importance.max,
+                  priority: Priority.high,
+                ),
+                iOS: DarwinNotificationDetails(),
+              ),
+            );
+          }
+        } catch (e) {
+          debugPrint('Error polling status: $e');
+        }
+      }
+    });
   }
 
   @override
   void dispose() {
+    _pollingTimer?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -47,54 +103,82 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       body: SafeArea(
         bottom: false,
-        child: Stack(
+        child: IndexedStack(
+          index: _currentNavIndex,
           children: [
-            Column(
-              children: [
-                _buildTopHeader(),
-                Expanded(
-                  child: Container(
-                    color: _surface,
-                    child: SingleChildScrollView(
-                      padding: EdgeInsets.fromLTRB(
-                        24,
-                        24,
-                        24,
-                        124 + bottomInset,
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          _buildStatistik(),
-                          const SizedBox(height: 24),
-
-                          _buildSectionTitle('Jadwal Hari Ini'),
-                          const SizedBox(height: 16),
-                          _buildJadwalList(),
-                          const SizedBox(height: 34),
-                          _buildSectionTitle('Menu Cepat'),
-                          const SizedBox(height: 16),
-                          _buildMenuRow(),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-            // Positioned(
-            //   top: 180,
-            //   left: 24,
-            //   right: 24,
-            //   child: _buildStatistik(),
-            // ),
+            _buildDashboardContent(bottomInset),
+            JadwalScreen(user: widget.user),
+            RekapScreen(user: widget.user),
+            ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
         ),
       ),
       bottomNavigationBar: _buildBottomNav(bottomInset),
+    );
+  }
+
+  Widget _buildDashboardContent(double bottomInset) {
+    return Stack(
+      children: [
+        Column(
+          children: [
+            _buildTopHeader(),
+            Expanded(
+              child: Container(
+                color: _surface,
+                child: SingleChildScrollView(
+                  padding: EdgeInsets.fromLTRB(
+                    24,
+                    24,
+                    24,
+                    124 + bottomInset,
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildStatistik(),
+                      const SizedBox(height: 24),
+
+                      _buildSectionTitle('Jadwal Asli'),
+                      const SizedBox(height: 16),
+                      _buildJadwalList(),
+
+                      ValueListenableBuilder<List<Map<String, String>>>(
+                        valueListenable: _vm.jadwalPenggantiHariIni,
+                        builder: (context, pengganti, _) {
+                          if (pengganti.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: 24),
+                              _buildSectionTitle('Jadwal Pengganti'),
+                              const SizedBox(height: 16),
+                              ...pengganti.map((j) {
+                                return Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildJadwalCard(j, isPengganti: true),
+                                );
+                              }),
+                            ],
+                          );
+                        },
+                      ),
+
+                      const SizedBox(height: 34),
+                      _buildSectionTitle('Menu Cepat'),
+                      const SizedBox(height: 16),
+                      _buildMenuRow(),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ],
     );
   }
 
@@ -307,7 +391,10 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     );
   }
 
-  Widget _buildJadwalCard(Map<String, String> jadwal) {
+  Widget _buildJadwalCard(Map<String, String> jadwal, {bool isPengganti = false}) {
+    final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
+    final iconColor = isPengganti ? Colors.blue : _ink;
+    final iconBgColor = isPengganti ? Colors.blue.shade100 : const Color(0x33D0FF00);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -327,7 +414,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           width: double.infinity,
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: cardColor,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: _stroke),
             boxShadow: const [
@@ -344,11 +431,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 width: 48,
                 height: 48,
                 decoration: BoxDecoration(
-                  color: const Color(0x33D0FF00),
+                  color: iconBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child:
-                    const Icon(Icons.computer_outlined, color: _ink, size: 24),
+                    Icon(Icons.computer_outlined, color: iconColor, size: 24),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -405,7 +492,15 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             child: Padding(
               padding: EdgeInsets.only(right: menu == menus.last ? 0 : 10),
               child: GestureDetector(
-                onTap: () => _showComingSoon(context),
+                onTap: () {
+                  if (menu['label'] == 'Jadwal') {
+                    setState(() => _currentNavIndex = 1);
+                  } else if (menu['label'] == 'Rekap') {
+                    setState(() => _currentNavIndex = 2);
+                  } else {
+                    _showComingSoon(context);
+                  }
+                },
                 child: Column(
                   children: [
                     Container(
@@ -471,12 +566,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
               child: InkWell(
                 borderRadius: BorderRadius.circular(12),
                 onTap: () {
-                  if (i == 0) {
-                    setState(() => _currentNavIndex = i);
-                    return;
-                  }
                   setState(() => _currentNavIndex = i);
-                  _showComingSoon(context);
                 },
                 child: Column(
                   mainAxisSize: MainAxisSize.min,

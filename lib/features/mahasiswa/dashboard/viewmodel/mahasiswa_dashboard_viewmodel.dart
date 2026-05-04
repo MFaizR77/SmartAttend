@@ -10,6 +10,8 @@ import '../../../../data/local/hive_helper.dart';
 class MahasiswaDashboardViewModel {
   final ValueNotifier<List<Map<String, String>>> jadwalHariIni =
       ValueNotifier([]);
+  final ValueNotifier<List<Map<String, String>>> jadwalPenggantiHariIni =
+      ValueNotifier([]);
   final ValueNotifier<Map<String, int>> statistik = ValueNotifier({});
 
   Future<void> loadData(User user) async {
@@ -36,6 +38,17 @@ class MahasiswaDashboardViewModel {
       }).toList();
 
       jadwalHariIni.value = mappedJadwal;
+
+      // Ambil jadwal pengganti yang sudah diapprove admin
+      final penggantiDB = await DatabaseService().getJadwalPenggantiMahasiswa(user.kelas!);
+      jadwalPenggantiHariIni.value = penggantiDB.map((doc) {
+        return {
+          'id': doc['_id']?.toString() ?? '',
+          'mataKuliah': '${doc['namaMK']} (Pengganti)',
+          'jam': '${doc['jamMulaiPengganti']} - ${doc['jamSelesaiPengganti']}',
+          'ruang': doc['ruanganPengganti']?.toString() ?? '-',
+        };
+      }).toList();
 
       // Cache jadwal ke Hive untuk mode offline (berbasis hari)
       final hariIni = DateTime.now().weekday;
@@ -69,6 +82,7 @@ class MahasiswaDashboardViewModel {
 
   void dispose() {
     jadwalHariIni.dispose();
+    jadwalPenggantiHariIni.dispose();
     statistik.dispose();
   }
 }

@@ -1,11 +1,8 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
-import '../../../../data/local/models/user.dart';
 
-class RekapScreen extends StatelessWidget {
-  final User user;
-
-  const RekapScreen({super.key, required this.user});
+class ManajemenJadwalScreen extends StatelessWidget {
+  const ManajemenJadwalScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -19,7 +16,7 @@ class RekapScreen extends StatelessWidget {
             borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
           ),
           child: const Text(
-            'Rekap\nKehadiran',
+            'Manajemen\nJadwal',
             style: TextStyle(
               color: AppColors.primary,
               fontFamily: 'Plus Jakarta Sans',
@@ -35,10 +32,10 @@ class RekapScreen extends StatelessWidget {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.bar_chart, size: 80, color: AppColors.border),
+                Icon(Icons.calendar_month, size: 80, color: AppColors.border),
                 const SizedBox(height: 16),
                 const Text(
-                  'Rekap belum tersedia',
+                  'Fitur Daftar Jadwal Kuliah',
                   style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
                 ),
               ],

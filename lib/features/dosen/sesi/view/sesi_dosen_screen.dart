@@ -239,26 +239,61 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                   ),
                 ),
                 const SizedBox(height: 16),
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      if (_vm.materiController.text.trim().isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Materi tidak boleh kosong')));
-                        return;
-                      }
-                      await _vm.simpanMateri();
-                      if (mounted) {
-                        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Laporan materi berhasil disimpan', style: TextStyle(color: Colors.white)), backgroundColor: AppColors.success));
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      padding: const EdgeInsets.symmetric(vertical: 16),
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    ),
-                    child: const Text('Simpan Laporan', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white)),
-                  ),
+                ValueListenableBuilder<bool>(
+                  valueListenable: _vm.isLaporanTerkirim,
+                  builder: (context, isTerkirim, child) {
+                    return SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: isTerkirim
+                            ? null
+                            : () async {
+                                final scaffoldMessenger = ScaffoldMessenger.of(context);
+                                
+                                if (_vm.materiController.text.trim().isEmpty) {
+                                  scaffoldMessenger.showSnackBar(
+                                    SnackBar(
+                                      content: const Text('Materi tidak boleh kosong'),
+                                      backgroundColor: AppColors.error,
+                                      behavior: SnackBarBehavior.floating,
+                                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                      margin: const EdgeInsets.all(16),
+                                    )
+                                  );
+                                  return;
+                                }
+                                await _vm.simpanMateri();
+                                
+                                scaffoldMessenger.showSnackBar(
+                                  SnackBar(
+                                    content: const Row(
+                                      children: [
+                                        Icon(Icons.check_circle, color: Colors.white),
+                                        SizedBox(width: 12),
+                                        Text('Laporan materi berhasil disimpan', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                      ],
+                                    ),
+                                    backgroundColor: AppColors.success,
+                                    behavior: SnackBarBehavior.floating,
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                    margin: const EdgeInsets.all(16),
+                                    elevation: 4,
+                                  )
+                                );
+                              },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isTerkirim ? Colors.grey : AppColors.primary,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        ),
+                        icon: Icon(isTerkirim ? Icons.check_circle : Icons.save, color: Colors.white),
+                        label: Text(
+                          isTerkirim ? 'Laporan Terkirim' : 'Simpan Laporan',
+                          style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Colors.white),
+                        ),
+                      ),
+                    );
+                  },
                 ),
               ],
             ),

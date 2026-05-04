@@ -37,11 +37,11 @@ class _PresensiScreenState extends State<PresensiScreen> {
   }
 
   void _handleCheckIn() async {
-    // 1. Validasi Jendela Waktu Lokal (Local Time-Window)
-    if (!_vm.isWithinTimeWindow(widget.jadwal['jam'] ?? '')) {
+    // 1. Validasi Kelas sudah dimulai oleh Dosen
+    if (!_vm.isKelasBuka.value) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Absen ditolak: Di luar jam perkuliahan (${widget.jadwal['jam']})'),
+        const SnackBar(
+          content: Text('Absen ditolak: Sesi kelas belum dimulai atau sudah diakhiri oleh dosen.'),
           backgroundColor: AppColors.error,
         ),
       );
@@ -163,57 +163,70 @@ class _PresensiScreenState extends State<PresensiScreen> {
 
                     // Big Action Button
                     ValueListenableBuilder<bool>(
-                      valueListenable: _vm.isLoading,
-                      builder: (context, isLoading, _) {
-                        return Material(
-                          color: Colors.transparent,
-                          child: InkWell(
-                            onTap: isHadir || isLoading ? null : _handleCheckIn,
-                            borderRadius: BorderRadius.circular(100),
-                            child: AnimatedContainer(
-                              duration: const Duration(milliseconds: 300),
-                              width: 200,
-                              height: 200,
-                              decoration: BoxDecoration(
-                                shape: BoxShape.circle,
-                                color: isHadir
-                                    ? AppColors.success
-                                    : (isLoading ? AppColors.accentLight : AppColors.accent),
-                                boxShadow: [
-                                  if (!isHadir && !isLoading)
-                                    BoxShadow(
-                                      color: AppColors.accent.withValues(alpha: 0.4),
-                                      blurRadius: 20,
-                                      spreadRadius: 5,
-                                    ),
-                                ],
-                              ),
-                              child: Center(
-                                child: isLoading
-                                    ? const CircularProgressIndicator(color: Colors.white)
-                                    : Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            isHadir ? Icons.check : Icons.fingerprint,
-                                            size: 64,
-                                            color: Colors.white,
+                      valueListenable: _vm.isKelasBuka,
+                      builder: (context, isKelasBuka, _) {
+                        return ValueListenableBuilder<bool>(
+                          valueListenable: _vm.isLoading,
+                          builder: (context, isLoading, _) {
+                            final Color buttonColor = isHadir
+                                ? AppColors.success
+                                : (!isKelasBuka
+                                    ? AppColors.error
+                                    : (isLoading ? AppColors.accentLight : AppColors.accent));
+
+                            return Material(
+                              color: Colors.transparent,
+                              child: InkWell(
+                                onTap: isHadir || isLoading || !isKelasBuka ? null : _handleCheckIn,
+                                borderRadius: BorderRadius.circular(100),
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 300),
+                                  width: 200,
+                                  height: 200,
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: buttonColor,
+                                    boxShadow: [
+                                      if (!isHadir && !isLoading && isKelasBuka)
+                                        BoxShadow(
+                                          color: AppColors.accent.withValues(alpha: 0.4),
+                                          blurRadius: 20,
+                                          spreadRadius: 5,
+                                        ),
+                                    ],
+                                  ),
+                                  child: Center(
+                                    child: isLoading
+                                        ? const CircularProgressIndicator(color: Colors.white)
+                                        : Column(
+                                            mainAxisAlignment: MainAxisAlignment.center,
+                                            children: [
+                                              Icon(
+                                                isHadir 
+                                                    ? Icons.check 
+                                                    : (!isKelasBuka ? Icons.lock : Icons.fingerprint),
+                                                size: 64,
+                                                color: Colors.white,
+                                              ),
+                                              const SizedBox(height: 8),
+                                              Text(
+                                                isHadir 
+                                                    ? 'Selesai' 
+                                                    : (!isKelasBuka ? 'Sesi\nTerkunci' : 'Tap untuk\nCheck-In'),
+                                                textAlign: TextAlign.center,
+                                                style: const TextStyle(
+                                                  color: Colors.white,
+                                                  fontSize: 18,
+                                                  fontWeight: FontWeight.bold,
+                                                ),
+                                              ),
+                                            ],
                                           ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            isHadir ? 'Selesai' : 'Tap untuk\nCheck-In',
-                                            textAlign: TextAlign.center,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 18,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
+                                  ),
+                                ),
                               ),
-                            ),
-                          ),
+                            );
+                          },
                         );
                       },
                     ),

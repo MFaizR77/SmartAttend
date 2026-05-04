@@ -12,6 +12,7 @@ class SesiDosenViewModel {
   final ValueNotifier<bool> isKelasBerjalan = ValueNotifier(false);
   final ValueNotifier<bool> isKelasSelesai = ValueNotifier(false);
   final ValueNotifier<bool> isLoading = ValueNotifier(false);
+  final ValueNotifier<bool> isLaporanTerkirim = ValueNotifier(false);
   final TextEditingController materiController = TextEditingController();
 
   DateTime? _waktuMulai;
@@ -53,6 +54,7 @@ class SesiDosenViewModel {
         isKelasBerjalan.value = false;
         isKelasSelesai.value = true;
         materiController.text = _currentLaporan!.materi ?? '';
+        isLaporanTerkirim.value = (_currentLaporan!.materi != null && _currentLaporan!.materi!.trim().isNotEmpty);
       } else {
         isKelasBerjalan.value = true;
         isKelasSelesai.value = false;
@@ -106,15 +108,20 @@ class SesiDosenViewModel {
     final laporan = _currentLaporan?.copyWith(
       materi: materiController.text,
       syncStatus: 'pending'
+    ) ?? LaporanDosen(
+      jadwalId: jadwalId,
+      dosenId: dosenId,
+      waktuMulai: _waktuMulai ?? DateTime.now(),
+      materi: materiController.text,
+      syncStatus: 'pending'
     );
 
-    if (laporan != null) {
-      await _saveData(laporan);
-      
-      // Jika sudah diisi, batalkan notifikasi pengingat
-      if (materiController.text.trim().isNotEmpty) {
-        await NotificationService().cancelDailyReminder();
-      }
+    await _saveData(laporan);
+    
+    // Jika sudah diisi, batalkan notifikasi pengingat dan ubah status tombol
+    if (materiController.text.trim().isNotEmpty) {
+      isLaporanTerkirim.value = true;
+      await NotificationService().cancelDailyReminder();
     }
     isLoading.value = false;
   }
@@ -142,6 +149,7 @@ class SesiDosenViewModel {
     isKelasBerjalan.dispose();
     isKelasSelesai.dispose();
     isLoading.dispose();
+    isLaporanTerkirim.dispose();
     materiController.dispose();
   }
 }
