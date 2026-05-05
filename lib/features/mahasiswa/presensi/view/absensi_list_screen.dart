@@ -43,15 +43,48 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
       final kelas = widget.user.kelas ?? '';
       if (kelas.isEmpty) throw Exception('Data kelas tidak ditemukan.');
 
-      final jadwal = await DatabaseService().getJadwalMahasiswa(kelas);
+      // 1. Ambil jadwal reguler
+      final reguler = await DatabaseService().getJadwalMahasiswa(kelas);
+
+      // 2. Ambil jadwal pengganti yang sudah disetujui
+      final pengganti =
+          await DatabaseService().getJadwalPenggantiMahasiswa(kelas);
+
+      // 3. Gabungkan dan petakan (map) agar formatnya seragam
+      final List<Map<String, dynamic>> gabungan = [];
+
+      // Masukkan reguler
+      gabungan.addAll(reguler);
+
+      // Masukkan pengganti (dengan pemetaan field)
+      for (var p in pengganti) {
+        gabungan.add({
+          '_id': p['_id'],
+          'namaMK': p['namaMK'] ?? 'Mata Kuliah (Pengganti)',
+          'tipe': 'Pengganti',
+          'jamMulai': p['jamMulaiPengganti'] ?? '',
+          'jamSelesai': p['jamSelesaiPengganti'] ?? '',
+          'ruangan': p['ruanganPengganti'] ?? '',
+          'dosenId': p['dosenId'] ?? '',
+          'isPengganti': true,
+        });
+      }
+
+      // 4. Urutkan berdasarkan jam mulai
+      gabungan.sort(
+        (a, b) => (a['jamMulai'] as String? ?? '').compareTo(
+          b['jamMulai'] as String? ?? '',
+        ),
+      );
+
       if (!mounted) return;
       setState(() {
-        _jadwalHariIni = jadwal;
+        _jadwalHariIni = gabungan;
         _isLoading = false;
       });
 
       // Check status presensi & kelas untuk setiap jadwal secara paralel
-      for (final j in jadwal) {
+      for (final j in gabungan) {
         final id = j['_id']?.toString() ?? '';
         if (id.isEmpty) continue;
         _checkStatus(id);

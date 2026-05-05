@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../viewmodel/jadwal_viewmodel.dart';
@@ -14,15 +16,36 @@ class JadwalScreen extends StatefulWidget {
 
 class _JadwalScreenState extends State<JadwalScreen> {
   final _vm = JadwalViewModel();
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    _updateConnectionStatus(result);
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> result) {
+    if (!mounted) return;
+    setState(() {
+      _isOnline =
+          result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    });
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -36,6 +59,7 @@ class _JadwalScreenState extends State<JadwalScreen> {
         child: Column(
           children: [
             _buildHeader(),
+            _buildDayPicker(),
             Expanded(
               child: ValueListenableBuilder<bool>(
                 valueListenable: _vm.isLoading,
@@ -54,13 +78,24 @@ class _JadwalScreenState extends State<JadwalScreen> {
                         return _buildErrorState(error);
                       }
                       return ValueListenableBuilder<
-                          Map<String, List<Map<String, dynamic>>>>(
+                        Map<String, List<Map<String, dynamic>>>
+                      >(
                         valueListenable: _vm.jadwalPerHari,
                         builder: (_, jadwalPerHari, __) {
-                          if (jadwalPerHari.isEmpty) {
-                            return _buildEmptyState();
-                          }
-                          return _buildScheduleList(jadwalPerHari);
+                          return ValueListenableBuilder<String>(
+                            valueListenable: _vm.selectedHari,
+                            builder: (context, selectedHari, _) {
+                              final currentJadwal =
+                                  jadwalPerHari[selectedHari] ?? [];
+                              if (currentJadwal.isEmpty) {
+                                return _buildEmptyState(selectedHari);
+                              }
+                              return _buildScheduleList(
+                                selectedHari,
+                                currentJadwal,
+                              );
+                            },
+                          );
                         },
                       );
                     },
@@ -107,45 +142,94 @@ class _JadwalScreenState extends State<JadwalScreen> {
               letterSpacing: -0.6,
             ),
           ),
-          GestureDetector(
-            onTap: () => _vm.loadData(widget.user),
-            child: Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: Colors.white.withOpacity(0.25)),
-              ),
-              child: const Icon(Icons.refresh_rounded,
-                  color: Colors.white, size: 20),
-            ),
-          ),
         ],
       ),
     );
   }
 
-  Widget _buildScheduleList(Map<String, List<Map<String, dynamic>>> jadwalPerHari) {
-    return ListView(
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
-      children: jadwalPerHari.entries.map((entry) {
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildDayHeader(entry.key),
-            const SizedBox(height: 12),
-            ...entry.value.map((jadwal) {
-              final status = _vm.getStatusJadwal(jadwal);
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: _buildScheduleCard(jadwal, status),
-              );
-            }),
-            const SizedBox(height: 16),
-          ],
-        );
-      }).toList(),
+  Widget _buildDayPicker() {
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
+      child: Row(
+        children: JadwalViewModel.urutanHari.map((hari) {
+          final shortName = hari.substring(0, 3);
+          return Expanded(
+            child: ValueListenableBuilder<String>(
+              valueListenable: _vm.selectedHari,
+              builder: (context, selected, _) {
+                final isSelected = selected == hari;
+                return GestureDetector(
+                  onTap: () => _vm.selectedHari.value = hari,
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    margin: const EdgeInsets.symmetric(horizontal: 2),
+                    padding: const EdgeInsets.symmetric(vertical: 10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? AppColors.primaryBlue : Colors.white,
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: isSelected
+                            ? AppColors.primaryBlue
+                            : AppColors.border.withOpacity(0.5),
+                        width: 1,
+                      ),
+                      boxShadow: isSelected
+                          ? [
+                              BoxShadow(
+                                color: AppColors.primaryBlue.withOpacity(0.2),
+                                blurRadius: 4,
+                                offset: const Offset(0, 2),
+                              ),
+                            ]
+                          : null,
+                    ),
+                    child: Center(
+                      child: Text(
+                        shortName,
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : AppColors.textSecondary,
+                          fontWeight: isSelected
+                              ? FontWeight.w800
+                              : FontWeight.w600,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildScheduleList(
+    String selectedHari,
+    List<Map<String, dynamic>> schedules,
+  ) {
+    return RefreshIndicator(
+      onRefresh: () => _vm.loadData(widget.user),
+      color: AppColors.primaryBlue,
+      child: ListView(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.fromLTRB(24, 4, 24, 40),
+        children: [
+          _buildDayHeader(selectedHari),
+          const SizedBox(height: 12),
+          ...schedules.map((jadwal) {
+            final status = _vm.getStatusJadwal(jadwal);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 12),
+              child: _buildScheduleCard(jadwal, status),
+            );
+          }),
+        ],
+      ),
     );
   }
 
@@ -168,8 +252,7 @@ class _JadwalScreenState extends State<JadwalScreen> {
         if (hariSekarang) ...[
           const SizedBox(width: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
             decoration: BoxDecoration(
               color: AppColors.primaryBlue.withOpacity(0.12),
               borderRadius: BorderRadius.circular(20),
@@ -204,15 +287,16 @@ class _JadwalScreenState extends State<JadwalScreen> {
   }
 
   Widget _buildScheduleCard(
-      Map<String, dynamic> jadwal, Map<String, dynamic> status) {
+    Map<String, dynamic> jadwal,
+    Map<String, dynamic> status,
+  ) {
     final mataKuliah = jadwal['namaMK']?.toString() ?? '-';
     final tipe = jadwal['tipe']?.toString() ?? '';
     final jamMulai = jadwal['jamMulai']?.toString() ?? '-';
     final jamSelesai = jadwal['jamSelesai']?.toString() ?? '-';
     final ruangan = jadwal['ruangan']?.toString() ?? '-';
-    final namaDosen = jadwal['namaDosen']?.toString() ??
-        jadwal['dosenId']?.toString() ??
-        '-';
+    final namaDosen =
+        jadwal['namaDosen']?.toString() ?? jadwal['dosenId']?.toString() ?? '-';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -237,7 +321,11 @@ class _JadwalScreenState extends State<JadwalScreen> {
               color: AppColors.primaryBlue.withOpacity(0.12),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: const Icon(Icons.class_, color: AppColors.primaryBlue, size: 24),
+            child: const Icon(
+              Icons.class_,
+              color: AppColors.primaryBlue,
+              size: 24,
+            ),
           ),
           const SizedBox(width: 14),
           Expanded(
@@ -258,8 +346,11 @@ class _JadwalScreenState extends State<JadwalScreen> {
                 const SizedBox(height: 4),
                 Row(
                   children: [
-                    const Icon(Icons.access_time,
-                        size: 13, color: Color(0xFF6B7280)),
+                    const Icon(
+                      Icons.access_time,
+                      size: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
@@ -276,12 +367,19 @@ class _JadwalScreenState extends State<JadwalScreen> {
                     ),
                     const Padding(
                       padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text('•',
-                          style: TextStyle(
-                              color: Color(0xFFD1D5DB), fontSize: 12)),
+                      child: Text(
+                        '•',
+                        style: TextStyle(
+                          color: Color(0xFFD1D5DB),
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
-                    const Icon(Icons.location_on,
-                        size: 13, color: Color(0xFF6B7280)),
+                    const Icon(
+                      Icons.location_on,
+                      size: 13,
+                      color: Color(0xFF6B7280),
+                    ),
                     const SizedBox(width: 4),
                     Flexible(
                       child: Text(
@@ -301,8 +399,11 @@ class _JadwalScreenState extends State<JadwalScreen> {
                 const SizedBox(height: 3),
                 Row(
                   children: [
-                    const Icon(Icons.person,
-                        size: 13, color: Color(0xFF9CA3AF)),
+                    const Icon(
+                      Icons.person,
+                      size: 13,
+                      color: Color(0xFF9CA3AF),
+                    ),
                     const SizedBox(width: 4),
                     Expanded(
                       child: Text(
@@ -324,8 +425,7 @@ class _JadwalScreenState extends State<JadwalScreen> {
           ),
           const SizedBox(width: 8),
           Container(
-            padding:
-                const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
             decoration: BoxDecoration(
               color: status['statusColor'] as Color,
               borderRadius: BorderRadius.circular(20),
@@ -345,17 +445,20 @@ class _JadwalScreenState extends State<JadwalScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(String hari) {
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.calendar_today_outlined,
-              size: 72, color: AppColors.border),
+          Icon(
+            Icons.calendar_today_outlined,
+            size: 72,
+            color: AppColors.border,
+          ),
           const SizedBox(height: 16),
-          const Text(
-            'Tidak ada jadwal ditemukan',
-            style: TextStyle(
+          Text(
+            'Tidak ada jadwal hari $hari',
+            style: const TextStyle(
               color: AppColors.textSecondary,
               fontSize: 16,
               fontFamily: 'Plus Jakarta Sans',
@@ -364,7 +467,8 @@ class _JadwalScreenState extends State<JadwalScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Jadwal untuk kelas Anda belum tersedia',
+            'Silakan pilih hari lain atau nikmati waktu istirahatmu!',
+            textAlign: TextAlign.center,
             style: TextStyle(
               color: AppColors.textSecondary,
               fontSize: 13,
@@ -383,8 +487,11 @@ class _JadwalScreenState extends State<JadwalScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.cloud_off_rounded,
-                size: 72, color: AppColors.textSecondary),
+            const Icon(
+              Icons.cloud_off_rounded,
+              size: 72,
+              color: AppColors.textSecondary,
+            ),
             const SizedBox(height: 16),
             const Text(
               'Gagal memuat jadwal',
@@ -414,7 +521,8 @@ class _JadwalScreenState extends State<JadwalScreen> {
                 backgroundColor: AppColors.primaryBlue,
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12)),
+                  borderRadius: BorderRadius.circular(12),
+                ),
               ),
             ),
           ],

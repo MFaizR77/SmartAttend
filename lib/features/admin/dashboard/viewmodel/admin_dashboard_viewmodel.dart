@@ -8,7 +8,7 @@ class AdminDashboardViewModel {
   final ValueNotifier<List<Map<String, String>>> logAktivitas =
       ValueNotifier([]);
 
-  void loadData() {
+  Future<void> loadData() async {
     statistik.value = {
       'totalMahasiswa': DummyData.totalMahasiswa,
       'totalDosen': DummyData.totalDosen,

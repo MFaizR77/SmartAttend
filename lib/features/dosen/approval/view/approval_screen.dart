@@ -12,13 +12,21 @@ class ApprovalScreen extends StatelessWidget {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           decoration: const BoxDecoration(
-            color: AppColors.brand,
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+            gradient: LinearGradient(
+              begin: Alignment(0.29, -0.41),
+              end: Alignment(0.71, 1.41),
+              colors: [
+                Color(0xFF1A237E),
+                Color(0xFF1E3A8A),
+                Color(0xFF1565C0),
+              ],
+            ),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
           child: const Text(
             'Approval\nIzin & Sakit',
             style: TextStyle(
-              color: AppColors.primary,
+              color: Colors.white,
               fontFamily: 'Plus Jakarta Sans',
               fontWeight: FontWeight.w800,
               height: 1.1,

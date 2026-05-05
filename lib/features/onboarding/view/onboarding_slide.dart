@@ -68,7 +68,7 @@ class OnboardingSlide extends StatelessWidget {
                   data.title,
                   textAlign: TextAlign.center,
                   style: const TextStyle(
-                    color: Colors.black,
+                    color: AppColors.surface,
                     fontSize: 32,
                     fontFamily: 'Inter',
                     fontWeight: FontWeight.w600,

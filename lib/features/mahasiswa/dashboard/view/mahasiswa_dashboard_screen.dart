@@ -11,6 +11,7 @@ import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../../auth/view/widgets/logout_confirm_dialog.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -34,6 +35,8 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   int _currentNavIndex = 0;
   Timer? _pollingTimer;
   final Set<String> _notifiedJadwalIds = {};
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
@@ -43,6 +46,24 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
     NotificationService().requestPermission();
     _startPolling();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    _updateConnectionStatus(result);
+
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> result) {
+    setState(() {
+      _isOnline =
+          result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    });
   }
 
   void _startPolling() {
@@ -89,6 +110,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -124,44 +146,53 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             Expanded(
               child: Container(
                 color: AppColors.dashboardSurface,
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatistik(),
-                      const SizedBox(height: 24),
+                child: RefreshIndicator(
+                  onRefresh: () => _vm.loadData(widget.user),
+                  color: AppColors.primaryBlue,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStatistik(),
+                        const SizedBox(height: 24),
 
-                      _buildSectionTitle('Jadwal Asli'),
-                      const SizedBox(height: 16),
-                      _buildJadwalList(),
+                        _buildSectionTitle('Jadwal Hari Ini'),
+                        const SizedBox(height: 16),
+                        _buildJadwalList(),
 
-                      ValueListenableBuilder<List<Map<String, String>>>(
-                        valueListenable: _vm.jadwalPenggantiHariIni,
-                        builder: (context, pengganti, _) {
-                          if (pengganti.isEmpty) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 24),
-                              _buildSectionTitle('Jadwal Pengganti'),
-                              const SizedBox(height: 16),
-                              ...pengganti.map((j) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildJadwalCard(j, isPengganti: true),
-                                );
-                              }),
-                            ],
-                          );
-                        },
-                      ),
+                        ValueListenableBuilder<List<Map<String, String>>>(
+                          valueListenable: _vm.jadwalPenggantiHariIni,
+                          builder: (context, pengganti, _) {
+                            if (pengganti.isEmpty)
+                              return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 24),
+                                _buildSectionTitle('Jadwal Pengganti'),
+                                const SizedBox(height: 16),
+                                ...pengganti.map((j) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildJadwalCard(
+                                      j,
+                                      isPengganti: true,
+                                    ),
+                                  );
+                                }),
+                              ],
+                            );
+                          },
+                        ),
 
-                      const SizedBox(height: 34),
-                      _buildSectionTitle('Menu Cepat'),
-                      const SizedBox(height: 16),
-                      _buildMenuRow(),
-                    ],
+                        const SizedBox(height: 34),
+                        _buildSectionTitle('Menu Cepat'),
+                        const SizedBox(height: 16),
+                        _buildMenuRow(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -180,11 +211,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         gradient: LinearGradient(
           begin: Alignment(0.29, -0.41),
           end: Alignment(0.71, 1.41),
-          colors: [
-            Color(0xFF1A237E),
-            Color(0xFF1E3A8A),
-            Color(0xFF1565C0),
-          ],
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
         ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
@@ -240,23 +267,30 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   vertical: 7,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.white.withOpacity(0.24),
+                  color: _isOnline
+                      ? Colors.white.withOpacity(0.24)
+                      : Colors.red.withOpacity(0.2),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: AppColors.surface, width: 1),
+                  border: Border.all(
+                    color: _isOnline
+                        ? AppColors.surface
+                        : Colors.red.withOpacity(0.5),
+                    width: 1,
+                  ),
                 ),
-                child: const Row(
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(
-                      Icons.wifi_off_rounded,
-                      color: AppColors.surface,
+                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                      color: _isOnline ? AppColors.surface : Colors.red,
                       size: 16,
                     ),
                     SizedBox(width: 8),
                     Text(
-                      'Offline',
+                      _isOnline ? 'Online' : 'Offline',
                       style: TextStyle(
-                        color: AppColors.surface,
+                        color: _isOnline ? AppColors.surface : Colors.red,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,

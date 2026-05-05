@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
@@ -25,15 +27,36 @@ class DosenDashboardScreen extends StatefulWidget {
 class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   final _vm = DosenDashboardViewModel();
   int _currentNavIndex = 0;
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    _updateConnectionStatus(result);
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> result) {
+    if (!mounted) return;
+    setState(() {
+      _isOnline =
+          result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    });
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -50,7 +73,9 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
           index: _currentNavIndex,
           children: [
             _buildDashboardContent(bottomInset),
-            _currentNavIndex == 1 ? RekapDosenScreen(user: widget.user) : const SizedBox(),
+            _currentNavIndex == 1
+                ? RekapDosenScreen(user: widget.user)
+                : const SizedBox(),
             _currentNavIndex == 2 ? const ApprovalScreen() : const SizedBox(),
             ProfilScreen(user: widget.user, onLogout: widget.onLogout),
           ],
@@ -67,19 +92,24 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
         Expanded(
           child: Container(
             color: AppColors.surface,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildStatistik(),
-                  const SizedBox(height: 24),
-                  _buildJadwalList(),
-                  const SizedBox(height: 34),
-                  _buildSectionTitle('Menu Cepat'),
-                  const SizedBox(height: 16),
-                  _buildMenuRow(),
-                ],
+            child: RefreshIndicator(
+              onRefresh: () => _vm.loadData(widget.user),
+              color: AppColors.primaryBlue,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildStatistik(),
+                    const SizedBox(height: 24),
+                    _buildJadwalList(),
+                    const SizedBox(height: 34),
+                    _buildSectionTitle('Menu Cepat'),
+                    const SizedBox(height: 16),
+                    _buildMenuRow(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -93,20 +123,24 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
       decoration: const BoxDecoration(
-        color: AppColors.brand,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   'Halo,\n${widget.user.nama}!',
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: AppColors.surface,
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -114,29 +148,74 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                     letterSpacing: -0.6,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    widget.user.roleLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+              ),
+              const SizedBox(width: 12),
+              _buildAvatar(widget.user.nama),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  widget.user.roleLabel,
+                  style: const TextStyle(
+                    color: AppColors.grayDark,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
                 ),
-              ],
-            ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: _isOnline
+                      ? Colors.white.withOpacity(0.24)
+                      : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isOnline
+                        ? AppColors.surface
+                        : Colors.red.withOpacity(0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                      color: _isOnline ? AppColors.surface : Colors.red,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: _isOnline ? AppColors.surface : Colors.red,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 12),
-          _buildAvatar(widget.user.nama),
         ],
       ),
     );
@@ -201,7 +280,11 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
             valueListenable: _vm.mahasiswaHadir,
             builder: (_, hadir, child) => ValueListenableBuilder<int>(
               valueListenable: _vm.totalMahasiswa,
-              builder: (_, total, child) => _buildStatCard('Kehadiran', '$hadir/$total', AppColors.success),
+              builder: (_, total, child) => _buildStatCard(
+                'Kehadiran',
+                '$hadir/$total',
+                AppColors.success,
+              ),
             ),
           ),
         ),
@@ -209,7 +292,8 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
         Expanded(
           child: ValueListenableBuilder<int>(
             valueListenable: _vm.izinPending,
-            builder: (_, pending, child) => _buildStatCard('Izin Pending', '$pending', AppColors.warning),
+            builder: (_, pending, child) =>
+                _buildStatCard('Izin Pending', '$pending', AppColors.warning),
           ),
         ),
       ],
@@ -275,13 +359,15 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       valueListenable: _vm.jadwalMengajar,
       builder: (_, jadwal, child) {
         final reguler = jadwal.where((j) => j['tipe'] != 'Pengganti').toList();
-        final pengganti = jadwal.where((j) => j['tipe'] == 'Pengganti').toList();
+        final pengganti = jadwal
+            .where((j) => j['tipe'] == 'Pengganti')
+            .toList();
 
         return Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Jadwal Mengajar selalu ditampilkan
-            _buildSectionTitle('Jadwal Mengajar'),
+            _buildSectionTitle('Jadwal Hari Ini'),
             const SizedBox(height: 16),
             if (reguler.isEmpty)
               Container(
@@ -320,7 +406,9 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
 
   Widget _buildJadwalCard(Map<String, String> j, {bool isPengganti = false}) {
     final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
-    final iconBgColor = isPengganti ? Colors.blue.shade100 : AppColors.brand.withValues(alpha: 0.2);
+    final iconBgColor = isPengganti
+        ? Colors.blue.shade100
+        : AppColors.primaryBlue.withValues(alpha: 0.2);
     final iconColor = isPengganti ? Colors.blue.shade700 : AppColors.primary;
     final textColor = isPengganti ? Colors.blue.shade800 : AppColors.primary;
     final borderColor = isPengganti ? Colors.blue.shade200 : AppColors.border;
@@ -335,7 +423,8 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (context) => SesiDosenScreen(user: widget.user, jadwal: j),
+                builder: (context) =>
+                    SesiDosenScreen(user: widget.user, jadwal: j),
               ),
             );
           },
@@ -346,7 +435,13 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
               color: cardColor,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(color: borderColor),
-              boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0x0C000000),
+                  blurRadius: 2,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
             child: Row(
               children: [
@@ -357,7 +452,13 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                     color: iconBgColor,
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: Icon(isPengganti ? Icons.swap_horiz_rounded : Icons.class_outlined, color: iconColor, size: 24),
+                  child: Icon(
+                    isPengganti
+                        ? Icons.swap_horiz_rounded
+                        : Icons.class_outlined,
+                    color: iconColor,
+                    size: 24,
+                  ),
                 ),
                 const SizedBox(width: 14),
                 Expanded(
@@ -366,13 +467,26 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                     children: [
                       Text(
                         j['mataKuliah'] ?? '-',
-                        maxLines: 1, overflow: TextOverflow.ellipsis,
-                        style: TextStyle(color: textColor, fontFamily: 'Plus Jakarta Sans', fontSize: 15, fontWeight: FontWeight.w700, height: 1.4),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                          color: textColor,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          height: 1.4,
+                        ),
                       ),
                       const SizedBox(height: 2),
                       Text(
                         '${j['jam']} • ${j['ruang']}',
-                        style: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w500, height: 1.3),
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w500,
+                          height: 1.3,
+                        ),
                       ),
                     ],
                   ),
@@ -403,13 +517,23 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
             child: GestureDetector(
               onTap: () {
                 if (menu['label'] == 'Ganti Jadwal') {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => PergantianJadwalScreen(user: widget.user)));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PergantianJadwalScreen(user: widget.user),
+                    ),
+                  );
                 } else if (menu['label'] == 'Rekap') {
                   setState(() => _currentNavIndex = 1);
                 } else if (menu['label'] == 'Approval') {
                   setState(() => _currentNavIndex = 2);
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur Sesi harus dipilih dari Jadwal'), duration: Duration(seconds: 1)));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Fitur Sesi harus dipilih dari Jadwal'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
                 }
               },
               child: Column(
@@ -421,15 +545,30 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: AppColors.border),
-                      boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0C000000),
+                          blurRadius: 2,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
-                    child: Icon(menu['icon'] as IconData, color: AppColors.primary, size: 30),
+                    child: Icon(
+                      menu['icon'] as IconData,
+                      color: AppColors.primary,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     menu['label'] as String,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
@@ -469,13 +608,17 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                   Icon(
                     item['icon'] as IconData,
                     size: 24,
-                    color: _currentNavIndex == i ? AppColors.brand : const Color(0xFF9CA3AF),
+                    color: _currentNavIndex == i
+                        ? AppColors.primaryBlue
+                        : const Color(0xFF9CA3AF),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     item['label'] as String,
                     style: TextStyle(
-                      color: _currentNavIndex == i ? AppColors.brand : const Color(0xFF9CA3AF),
+                      color: _currentNavIndex == i
+                          ? AppColors.primaryBlue
+                          : const Color(0xFF9CA3AF),
                       fontFamily: 'Plus Jakarta Sans',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,

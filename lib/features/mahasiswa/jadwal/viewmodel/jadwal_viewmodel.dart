@@ -6,11 +6,19 @@ import '../../../../data/remote/database_service.dart';
 class JadwalViewModel {
   final ValueNotifier<Map<String, List<Map<String, dynamic>>>> jadwalPerHari =
       ValueNotifier({});
+  final ValueNotifier<String> selectedHari =
+      ValueNotifier(DatabaseService().getHariIni());
   final ValueNotifier<bool> isLoading = ValueNotifier(false);
   final ValueNotifier<String?> errorMessage = ValueNotifier(null);
 
-  static const List<String> _urutanHari = [
-    'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+  static const List<String> urutanHari = [
+    'Senin',
+    'Selasa',
+    'Rabu',
+    'Kamis',
+    'Jumat',
+    'Sabtu',
+    'Minggu',
   ];
 
   Future<void> loadData(User user) async {
@@ -34,7 +42,7 @@ class JadwalViewModel {
       }
 
       final Map<String, List<Map<String, dynamic>>> sortedGrouped = {};
-      for (final hari in _urutanHari) {
+      for (final hari in urutanHari) {
         if (grouped.containsKey(hari)) {
           sortedGrouped[hari] = grouped[hari]!;
         }
@@ -115,6 +123,7 @@ class JadwalViewModel {
 
   void dispose() {
     jadwalPerHari.dispose();
+    selectedHari.dispose();
     isLoading.dispose();
     errorMessage.dispose();
   }
