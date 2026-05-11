@@ -138,7 +138,15 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
 
   Future<void> _doCheckIn(String jadwalId) async {
     if (_isSubmitting[jadwalId] == true) return;
+
+    // Re-check status kelas dari server sebelum submit (agar tidak stale)
+    try {
+      final buka = await DatabaseService().isKelasBerjalan(jadwalId);
+      if (mounted) setState(() => _isKelasBuka[jadwalId] = buka);
+    } catch (_) {}
+
     if (_isKelasBuka[jadwalId] != true) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text(
@@ -399,31 +407,48 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status badge
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: const Color(0x2D69F0AE),
-              border: Border.all(color: const Color(0x5969F0AE)),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Icon(Icons.radio_button_on, size: 6, color: Color(0xFF69F0AE)),
-                SizedBox(width: 8),
-                Text(
-                  'BERLANGSUNG',
-                  style: TextStyle(
-                    color: Color(0xFF69F0AE),
-                    fontSize: 10.5,
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontWeight: FontWeight.w700,
-                    letterSpacing: 0.5,
-                  ),
+          // Status badge — dynamic berdasarkan kelasBuka
+          Builder(
+            builder: (_) {
+              final buka = kelasBuka;
+              String badgeLabel;
+              Color badgeColor;
+              Color badgeBorder;
+              if (buka == true) {
+                badgeLabel = 'BERLANGSUNG';
+                badgeColor = const Color(0xFF69F0AE);
+                badgeBorder = const Color(0x5969F0AE);
+              } else {
+                badgeLabel = 'BELUM DIMULAI';
+                badgeColor = const Color(0xFFFFB74D);
+                badgeBorder = const Color(0x59FFB74D);
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: badgeColor.withOpacity(0.18),
+                  border: Border.all(color: badgeBorder),
+                  borderRadius: BorderRadius.circular(20),
                 ),
-              ],
-            ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.radio_button_on, size: 6, color: badgeColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      badgeLabel,
+                      style: TextStyle(
+                        color: badgeColor,
+                        fontSize: 10.5,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
           ),
           const SizedBox(height: 14),
 
@@ -519,8 +544,42 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
             ),
           ),
 
-          // Check-in button
-          if (!hadir) ...[
+          // Warning jika dosen belum membuka sesi
+          if (!hadir && kelasBuka != true) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: Colors.orange.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.orange.withOpacity(0.3)),
+              ),
+              child: const Row(
+                children: [
+                  Icon(
+                    Icons.hourglass_top_rounded,
+                    color: Colors.orange,
+                    size: 16,
+                  ),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Menunggu dosen membuka sesi kelas',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontSize: 12,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Check-in button — hanya muncul jika kelas sudah dibuka dosen
+          if (!hadir && kelasBuka == true) ...[
             const SizedBox(height: 14),
             GestureDetector(
               onTap: submitting ? null : () => _doCheckIn(id),
@@ -571,40 +630,6 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
                     ),
                   ],
                 ),
-              ),
-            ),
-          ],
-
-          // Warning if class not yet opened by lecturer
-          if (!hadir && kelasBuka == false) ...[
-            const SizedBox(height: 10),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.15),
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.orange.withOpacity(0.3)),
-              ),
-              child: const Row(
-                children: [
-                  Icon(
-                    Icons.warning_amber_rounded,
-                    color: Colors.orange,
-                    size: 14,
-                  ),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Dosen belum membuka sesi kelas',
-                      style: TextStyle(
-                        color: Colors.orange,
-                        fontSize: 11.5,
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
               ),
             ),
           ],

@@ -92,7 +92,7 @@ class AuthViewModel {
         await userBox.put('currentUser', jsonEncode(user.toMap()));
         await userBox.put(
           'expiryDate',
-          DateTime.now().add(const Duration(days: 1)).toIso8601String(),
+          DateTime.now().add(const Duration(days: 30)).toIso8601String(),
         );
 
         currentUser.value = user;

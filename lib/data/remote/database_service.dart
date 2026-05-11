@@ -7,47 +7,70 @@ class DatabaseService {
   DatabaseService._internal();
 
   Db? _db;
-  bool _isConnecting = false;
+  Future<void>? _connectionFuture;
 
-  Future<void> connect() async {
-    // Jika sedang konek, tunggu sampai selesai
-    if (_isConnecting) {
-      while (_isConnecting) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-      if (_db != null && _db!.isConnected) return;
+  Future<void> connect() {
+    if (_connectionFuture != null) {
+      return _connectionFuture!;
     }
+    _connectionFuture = _doConnect();
+    return _connectionFuture!;
+  }
 
-    if (_db != null) {
-      if (_db!.state == State.OPENING) {
-        while (_db!.state == State.OPENING) {
-          await Future.delayed(const Duration(milliseconds: 50));
+  Future<void> _doConnect() async {
+    try {
+      if (_db != null) {
+        if (_db!.state == State.OPENING) {
+          // Tunggu sampai selesai opening
+          int waitCount = 0;
+          while (_db!.state == State.OPENING && waitCount < 100) {
+            await Future.delayed(const Duration(milliseconds: 50));
+            waitCount++;
+          }
         }
-        return;
-      }
-      if (_db!.isConnected) {
-        try {
-          await _db!.serverStatus();
-          return;
-        } catch (_) {
+
+        if (_db!.isConnected) {
+          try {
+            await _db!.serverStatus();
+            return; // Koneksi masih bagus
+          } catch (_) {
+            // Koneksi rusak, buang dan buat ulang
+            try { await _db!.close(); } catch (_) {}
+            _db = null;
+          }
+        } else {
+          // State CLOSED atau tidak connected — buang instance lama
+          try { await _db!.close(); } catch (_) {}
           _db = null;
         }
       }
-    }
-    
-    _isConnecting = true;
-    try {
-      final mongoUri = dotenv.env['MONGODB_URI'];
-      if (mongoUri == null || mongoUri.isEmpty) {
-        throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
+      
+      await _openNewConnection();
+    } catch (e) {
+      // Retry 1x jika ConnectionException (transient network error)
+      final msg = e.toString();
+      if (msg.contains('ConnectionException') || msg.contains('reset by peer') || msg.contains('SocketException')) {
+        try { _db?.close(); } catch (_) {}
+        _db = null;
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _openNewConnection();
+      } else {
+        rethrow;
       }
-
-      _db = await Db.create(mongoUri);
-      await _db!.open(secure: true, tlsAllowInvalidCertificates: true);
-      print('✅ Berhasil terhubung ke MongoDB');
     } finally {
-      _isConnecting = false;
+      _connectionFuture = null;
     }
+  }
+
+  Future<void> _openNewConnection() async {
+    final mongoUri = dotenv.env['MONGODB_URI'];
+    if (mongoUri == null || mongoUri.isEmpty) {
+      throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
+    }
+
+    _db = await Db.create(mongoUri);
+    await _db!.open(secure: true, tlsAllowInvalidCertificates: true);
+    print('Berhasil terhubung ke MongoDB');
   }
 
   Future<Map<String, dynamic>?> login(String identifier, String password) async {
@@ -319,13 +342,48 @@ class DatabaseService {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    final record = await collection.findOne({
+    // Coba cari dengan tanggal sebagai BSON DateTime
+    var record = await collection.findOne({
       'jadwalId': jadwalId,
       'tanggal': {
         '\$gte': startOfDay,
         '\$lte': endOfDay,
       }
     });
+
+    // Jika tidak ditemukan, coba cari dengan tanggal sebagai ISO String
+    if (record == null) {
+      record = await collection.findOne({
+        'jadwalId': jadwalId,
+        'tanggal': {
+          '\$gte': startOfDay.toIso8601String(),
+          '\$lte': endOfDay.toIso8601String(),
+        }
+      });
+    }
+
+    // Fallback: cari tanpa filter tanggal, lalu cek manual
+    if (record == null) {
+      final allRecords = await collection.find({
+        'jadwalId': jadwalId,
+      }).toList();
+      
+      for (final r in allRecords) {
+        DateTime? tanggal;
+        if (r['tanggal'] is DateTime) {
+          tanggal = r['tanggal'];
+        } else if (r['tanggal'] is String) {
+          tanggal = DateTime.tryParse(r['tanggal']);
+        }
+        if (tanggal != null &&
+            tanggal.year == now.year &&
+            tanggal.month == now.month &&
+            tanggal.day == now.day) {
+          record = r;
+          break;
+        }
+      }
+    }
 
     if (record == null) return false;
     

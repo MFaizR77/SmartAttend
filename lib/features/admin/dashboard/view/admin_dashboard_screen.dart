@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -65,22 +66,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _currentNavIndex,
-          children: [
-            _buildDashboardContent(bottomInset),
-            const ManajemenUserScreen(),
-            const ManajemenJadwalScreen(),
-            ProfilScreen(user: widget.user, onLogout: widget.onLogout),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Keluar Aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w700)),
+            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal', style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Keluar',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Plus Jakarta Sans')),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          bottom: false,
+          child: _buildCurrentScreen(bottomInset),
         ),
+        bottomNavigationBar: _buildBottomNav(bottomInset),
       ),
-      bottomNavigationBar: _buildBottomNav(bottomInset),
     );
+  }
+
+  Widget _buildCurrentScreen(double bottomInset) {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildDashboardContent(bottomInset);
+      case 1:
+        return const ManajemenUserScreen();
+      case 2:
+        return const ManajemenJadwalScreen();
+      case 3:
+        return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
+      default:
+        return _buildDashboardContent(bottomInset);
+    }
   }
 
   Widget _buildDashboardContent(double bottomInset) {
