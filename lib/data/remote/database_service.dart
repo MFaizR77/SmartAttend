@@ -210,6 +210,31 @@ class DatabaseService {
     }
   }
 
+  /// Mengambil jadwal dosen pada hari tertentu berdasarkan tanggal (untuk fitur izin)
+  Future<List<Map<String, dynamic>>> getJadwalDosenByHari(String dosenId, DateTime tanggal) async {
+    await connect();
+    final hari = getHariFromDate(tanggal);
+    final cursor = _db!.collection('jadwal_kuliah').find({
+      '\$or': [
+        {'kodeDosen': dosenId},
+        {'dosenId': dosenId}
+      ],
+      'hari': hari,
+    });
+    final List<Map<String, dynamic>> jadwal = await cursor.toList();
+    jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
+    return jadwal;
+  }
+
+  /// Menyimpan pengajuan izin/sakit dosen ke collection izin_dosen
+  Future<void> submitIzinDosen(Map<String, dynamic> data) async {
+    await connect();
+    if (!data.containsKey('_id')) {
+      data['_id'] = ObjectId();
+    }
+    await _db!.collection('izin_dosen').insertOne(data);
+  }
+
   /// Menyimpan data presensi langsung ke MongoDB (ketika online)
   Future<void> insertRecordPresensi(Map<String, dynamic> record) async {
     await connect();
