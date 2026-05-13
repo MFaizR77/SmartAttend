@@ -36,13 +36,13 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
           decoration: const BoxDecoration(
-            color: AppColors.brand,
-            borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+            color: Color(0xFF01018B),
+            borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
           ),
           child: const Text(
             'Rekap\nPerkuliahan',
             style: TextStyle(
-              color: AppColors.primary,
+              color: Color(0xFFF6F6F6),
               fontFamily: 'Plus Jakarta Sans',
               fontWeight: FontWeight.w800,
               height: 1.1,
@@ -56,12 +56,69 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
             animation: _vm,
             builder: (context, _) {
               if (_vm.isLoading) {
-                return const Center(child: CircularProgressIndicator(color: AppColors.primary));
+                return const Center(
+                  child: CircularProgressIndicator(color: Color(0xFF01018B)),
+                );
               }
 
               if (_vm.errorMessage != null) {
                 return Center(
-                  child: Text(_vm.errorMessage!, style: const TextStyle(color: AppColors.error)),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(color: AppColors.border),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.wifi_off_rounded,
+                            color: AppColors.warning,
+                            size: 42,
+                          ),
+                          const SizedBox(height: 10),
+                          const Text(
+                            'Data rekap belum bisa dimuat',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: Color(0xFF1A1A1A),
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          const Text(
+                            'Periksa koneksi internet atau server, lalu coba lagi.',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppColors.textSecondary,
+                              fontSize: 13,
+                              height: 1.4,
+                            ),
+                          ),
+                          const SizedBox(height: 14),
+                          FilledButton.icon(
+                            onPressed: () => _vm.loadRekap(widget.user),
+                            icon: const Icon(Icons.refresh_rounded, size: 18),
+                            label: const Text('Coba lagi'),
+                            style: FilledButton.styleFrom(
+                              backgroundColor: Color(0xFF01018B),
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 14,
+                                vertical: 10,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 );
               }
 
@@ -70,11 +127,18 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(Icons.history_edu, size: 80, color: AppColors.border),
+                      Icon(
+                        Icons.history_edu,
+                        size: 80,
+                        color: AppColors.border,
+                      ),
                       SizedBox(height: 16),
                       Text(
                         'Belum ada BAP / Rekap yang tersimpan',
-                        style: TextStyle(color: AppColors.textSecondary, fontSize: 16),
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 16,
+                        ),
                       ),
                     ],
                   ),
@@ -99,21 +163,24 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
                           groupName,
                           style: const TextStyle(
                             fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
+                            fontWeight: FontWeight.w800,
+                            color: Color(0xFF1A1A1A),
                           ),
                         ),
                         const SizedBox(height: 12),
                         ...listLaporan.map((laporan) {
                           final date = laporan['tanggal'] as DateTime;
-                          final dateStr = DateFormat('dd MMM yyyy').format(date);
-                          final materi = laporan['materi'] ?? 'Tidak ada materi';
+                          final dateStr = DateFormat(
+                            'dd MMM yyyy',
+                          ).format(date);
+                          final materi =
+                              laporan['materi'] ?? 'Tidak ada materi';
 
                           return Container(
                             margin: const EdgeInsets.only(bottom: 12),
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: AppColors.surface,
+                              color: Colors.white,
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(color: AppColors.border),
                             ),
@@ -121,30 +188,41 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
                                   children: [
                                     Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
                                       decoration: BoxDecoration(
-                                        color: AppColors.primary.withValues(alpha: 0.1),
+                                        color: Color(0xFFEEF0FB),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
                                         dateStr,
                                         style: const TextStyle(
-                                          color: AppColors.primary,
+                                          color: Color(0xFF01018B),
                                           fontSize: 12,
                                           fontWeight: FontWeight.bold,
                                         ),
                                       ),
                                     ),
-                                    Icon(Icons.check_circle, color: AppColors.success, size: 20),
+                                    Icon(
+                                      Icons.check_circle,
+                                      color: AppColors.success,
+                                      size: 20,
+                                    ),
                                   ],
                                 ),
                                 const SizedBox(height: 12),
                                 const Text(
                                   'Materi yang diajarkan:',
-                                  style: TextStyle(color: AppColors.textSecondary, fontSize: 12),
+                                  style: TextStyle(
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
+                                  ),
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
