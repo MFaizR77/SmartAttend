@@ -8,11 +8,7 @@ class PresensiScreen extends StatefulWidget {
   final Map<String, String> jadwal;
   final User user;
 
-  const PresensiScreen({
-    super.key,
-    required this.jadwal,
-    required this.user,
-  });
+  const PresensiScreen({super.key, required this.jadwal, required this.user});
 
   @override
   State<PresensiScreen> createState() => _PresensiScreenState();
@@ -41,7 +37,9 @@ class _PresensiScreenState extends State<PresensiScreen> {
     if (!_vm.isKelasBuka.value) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Absen ditolak: Sesi kelas belum dimulai atau sudah diakhiri oleh dosen.'),
+          content: Text(
+            'Absen ditolak: Sesi kelas belum dimulai atau sudah diakhiri oleh dosen.',
+          ),
           backgroundColor: AppColors.error,
         ),
       );
@@ -50,28 +48,30 @@ class _PresensiScreenState extends State<PresensiScreen> {
 
     final jadwalId = widget.jadwal['id'] ?? '';
     if (jadwalId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('ID Jadwal tidak valid')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('ID Jadwal tidak valid')));
       return;
     }
 
     await _vm.doCheckIn(jadwalId, widget.user);
-    
+
     if (_vm.errorMessage.value != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(_vm.errorMessage.value!)),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(_vm.errorMessage.value!)));
       }
     } else if (_vm.isHadir.value) {
       if (mounted) {
         final isOffline = _vm.isOfflineMode.value;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(isOffline 
-              ? 'Presensi offline dicatat ke Hive. Akan disinkronkan.' 
-              : 'Presensi berhasil disimpan ke MongoDB.'),
+            content: Text(
+              isOffline
+                  ? 'Presensi offline dicatat ke Hive. Akan disinkronkan.'
+                  : 'Presensi berhasil disimpan ke MongoDB.',
+            ),
             backgroundColor: AppColors.success,
           ),
         );
@@ -83,6 +83,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
   Widget build(BuildContext context) {
     final dateFormat = DateFormat('EEEE, dd MMMM yyyy', 'id_ID');
     final todayStr = dateFormat.format(DateTime.now());
+    final canPop = Navigator.canPop(context);
 
     return Scaffold(
       backgroundColor: const Color(0xFFF4F5F8),
@@ -90,7 +91,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
         bottom: false,
         child: Column(
           children: [
-            _buildHeader(todayStr),
+            _buildHeader(todayStr, showBack: canPop),
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -112,18 +113,15 @@ class _PresensiScreenState extends State<PresensiScreen> {
     );
   }
 
-  Widget _buildHeader(String dateStr) {
+  Widget _buildHeader(String dateStr, {bool showBack = false}) {
+    final namaMK = widget.jadwal['namaMK'] ?? widget.jadwal['mataKuliah'] ?? '';
     return Container(
       width: double.infinity,
       decoration: const BoxDecoration(
         gradient: LinearGradient(
           begin: Alignment(0.29, -0.41),
           end: Alignment(0.71, 1.41),
-          colors: [
-            Color(0xFF1A237E),
-            Color(0xFF1E3A8A),
-            Color(0xFF1565C0),
-          ],
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
         ),
         borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
@@ -131,24 +129,66 @@ class _PresensiScreenState extends State<PresensiScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          if (showBack) ...[
+            GestureDetector(
+              onTap: () => Navigator.pop(context),
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.15),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: const Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.arrow_back_ios_new_rounded,
+                        color: Colors.white, size: 14),
+                    SizedBox(width: 4),
+                    Text(
+                      'Kembali',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
           const Text(
-            'Absensi',
+            'Presensi',
             style: TextStyle(
               color: Colors.white,
               fontSize: 28,
               fontFamily: 'Plus Jakarta Sans',
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.20,
+              fontWeight: FontWeight.w800,
+              height: 1.1,
+              letterSpacing: -0.6,
             ),
           ),
+          if (namaMK.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Text(
+              namaMK,
+              style: TextStyle(
+                color: Colors.white.withOpacity(0.75),
+                fontSize: 14,
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: Colors.white.withOpacity(0.12),
-              border: Border.all(
-                color: Colors.white.withOpacity(0.20),
-              ),
+              border: Border.all(color: Colors.white.withOpacity(0.20)),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Row(
@@ -161,10 +201,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
                     color: const Color(0xFF69F0AE),
                     borderRadius: BorderRadius.circular(3),
                     boxShadow: const [
-                      BoxShadow(
-                        color: Color(0xFF69F0AE),
-                        blurRadius: 6,
-                      ),
+                      BoxShadow(color: Color(0xFF69F0AE), blurRadius: 6),
                     ],
                   ),
                 ),
@@ -212,19 +249,13 @@ class _PresensiScreenState extends State<PresensiScreen> {
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
               color: const Color(0x2D69F0AE),
-              border: Border.all(
-                color: const Color(0x5969F0AE),
-              ),
+              border: Border.all(color: const Color(0x5969F0AE)),
               borderRadius: BorderRadius.circular(20),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Icon(
-                  Icons.radio_button_on,
-                  size: 6,
-                  color: Color(0xFF69F0AE),
-                ),
+                Icon(Icons.radio_button_on, size: 6, color: Color(0xFF69F0AE)),
                 SizedBox(width: 8),
                 Text(
                   'BERLANGSUNG',
@@ -341,7 +372,10 @@ class _PresensiScreenState extends State<PresensiScreen> {
               children: [
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
                   decoration: BoxDecoration(
                     color: isHadir
                         ? const Color(0xFFE6F9F0)
@@ -398,9 +432,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
                             const SizedBox(
                               width: 18,
                               height: 18,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                              ),
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             )
                           else
                             const Icon(
@@ -502,9 +534,7 @@ class _PresensiScreenState extends State<PresensiScreen> {
     return Container(
       decoration: BoxDecoration(
         color: Colors.white,
-        border: Border.all(
-          color: Colors.black.withOpacity(0.04),
-        ),
+        border: Border.all(color: Colors.black.withOpacity(0.04)),
         borderRadius: BorderRadius.circular(18),
         boxShadow: const [
           BoxShadow(

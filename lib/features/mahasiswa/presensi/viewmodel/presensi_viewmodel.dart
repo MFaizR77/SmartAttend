@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../data/local/hive_helper.dart';
 import '../../../../data/local/models/record_presensi.dart';
 import '../../../../data/local/models/user.dart';
@@ -38,8 +38,7 @@ class PresensiViewModel {
       }
 
       // 2. Jika tidak ada di lokal, cek online (ke MongoDB)
-      final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
-      final isOnline = connectivityResult.isNotEmpty && !connectivityResult.contains(ConnectivityResult.none);
+      final isOnline = await ConnectivityService().checkNow();
       
       if (isOnline) {
         final exists = await DatabaseService().checkPresensiExists(jadwalId, user.id);
@@ -61,8 +60,7 @@ class PresensiViewModel {
 
     try {
       // Cek koneksi internet
-      final List<ConnectivityResult> connectivityResult = await Connectivity().checkConnectivity();
-      final isOnline = connectivityResult.isNotEmpty && !connectivityResult.contains(ConnectivityResult.none);
+      final isOnline = await ConnectivityService().checkNow();
 
       final record = RecordPresensi(
         clientUuid: const Uuid().v4(),

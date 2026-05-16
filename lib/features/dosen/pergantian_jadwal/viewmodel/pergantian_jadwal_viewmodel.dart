@@ -80,4 +80,12 @@ class PergantianJadwalViewModel extends ChangeNotifier {
       notifyListeners();
     }
   }
+
+  Future<List<Map<String, dynamic>>> getDetailRuangan(DateTime tanggal, String namaRuangan) async {
+    try {
+      return await _db.getDetailJadwalRuangan(tanggal, namaRuangan);
+    } catch (e) {
+      return [];
+    }
+  }
 }

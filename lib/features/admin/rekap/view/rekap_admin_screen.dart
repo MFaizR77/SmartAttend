@@ -8,8 +8,8 @@ class RekapAdminScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Rekap Global'),
-        backgroundColor: AppColors.brand,
+        title: const Text('Rekap Admin'),
+        backgroundColor: AppColors.primaryBlue,
       ),
       body: Center(
         child: Column(

@@ -24,7 +24,7 @@ static SesiAbsensiModel hiveToMongo(SesiAbsensi hive) {
       jadwalId: mongo.jadwalId,
       tanggal: mongo.tanggal,
       status: mongo.status,
-      openedBy: mongo.openedBy,
+      dibukaOleh: mongo.openedBy,
       openedAt: mongo.openedAt,
       closedAt: mongo.closedAt,
       syncStatus: mongo.syncStatus,

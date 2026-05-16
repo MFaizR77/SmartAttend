@@ -6,9 +6,10 @@ class AppColors {
   AppColors._();
 
   // Background & Surface
-  static const Color background = Color(0xFFFFFFFF);
-  static const Color surface = Color(0xFFF8F8F8);
-  static const Color surfaceVariant = Color(0xFFFFFFFF);
+  static const Color background = Color(0xFFF5F5F5);
+  static const Color surface = Color(0xFFFFFFFF);
+  static const Color surfaceVariant = Color(0xFFF0F0F5);
+
   // Brand & Feature specific
   static const Color primaryBlue = Color(0xFF01018B);
   static const Color orange = Color(0xFFFF8003);
@@ -30,8 +31,8 @@ class AppColors {
   static const Color onboardingDotInactive = Color(0xFFC4C7C5);
   static const Color onboardingBlueLight = Color(0xFFE0E0FF);
 
-  // Primary
-  static const Color primary = Color(0xFF1E1E2C);
+  // Primary (Ink & Brand)
+  static const Color primary = Color(0xFF1A1A1A); // _ink
   static const Color primaryLight = Color(0xFF2D2D3F);
   static const Color brand = Color(0xFFD0FF00); // Lime Green
 
