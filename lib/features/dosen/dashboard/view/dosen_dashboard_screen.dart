@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
 import '../../sesi/view/sesi_dosen_screen.dart';
@@ -29,36 +28,15 @@ class DosenDashboardScreen extends StatefulWidget {
 class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   final _vm = DosenDashboardViewModel();
   int _currentNavIndex = 0;
-  bool _isOnline = true;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
-    _initConnectivity();
-  }
-
-  Future<void> _initConnectivity() async {
-    final connectivity = Connectivity();
-    final result = await connectivity.checkConnectivity();
-    _updateConnectionStatus(result);
-    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
-      _updateConnectionStatus,
-    );
-  }
-
-  void _updateConnectionStatus(List<ConnectivityResult> result) {
-    if (!mounted) return;
-    setState(() {
-      _isOnline =
-          result.isNotEmpty && !result.contains(ConnectivityResult.none);
-    });
   }
 
   @override
   void dispose() {
-    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -218,41 +196,44 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: _isOnline
-                      ? Colors.white.withOpacity(0.24)
-                      : Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isOnline
-                        ? AppColors.surface
-                        : Colors.red.withOpacity(0.5),
+              ValueListenableBuilder<bool>(
+                valueListenable: ConnectivityService().isOnline,
+                builder: (_, isOnline, __) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                      color: _isOnline ? AppColors.surface : Colors.red,
-                      size: 14,
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? Colors.white.withOpacity(0.24)
+                        : Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isOnline
+                          ? AppColors.surface
+                          : Colors.red.withOpacity(0.5),
                     ),
-                    const SizedBox(width: 6),
-                    Text(
-                      _isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        color: _isOnline ? AppColors.surface : Colors.red,
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                        color: isOnline ? AppColors.surface : Colors.red,
+                        size: 14,
                       ),
-                    ),
-                  ],
+                      const SizedBox(width: 6),
+                      Text(
+                        isOnline ? 'Online' : 'Offline',
+                        style: TextStyle(
+                          color: isOnline ? AppColors.surface : Colors.red,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],

@@ -12,6 +12,7 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
+import 'core/services/connectivity_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
@@ -19,7 +20,10 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
-  
+
+  // Inisialisasi monitor konektivitas (sumber tunggal status online/offline)
+  await ConnectivityService().init();
+
   // Inisialisasi proses sinkronisasi background
   SyncManager().init();
   

@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import 'package:uuid/uuid.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../../../data/local/models/record_presensi.dart';
@@ -123,8 +123,7 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
         return;
       }
 
-      final conn = await Connectivity().checkConnectivity();
-      final online = conn.isNotEmpty && !conn.contains(ConnectivityResult.none);
+      final online = await ConnectivityService().checkNow();
       if (online) {
         final exists = await DatabaseService().checkPresensiExists(
           jadwalId,
@@ -161,9 +160,7 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
     setState(() => _isSubmitting[jadwalId] = true);
 
     try {
-      final conn = await Connectivity().checkConnectivity();
-      final isOnline =
-          conn.isNotEmpty && !conn.contains(ConnectivityResult.none);
+      final isOnline = await ConnectivityService().checkNow();
 
       final record = RecordPresensi(
         clientUuid: const Uuid().v4(),

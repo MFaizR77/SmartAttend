@@ -1,6 +1,8 @@
-import 'package:connectivity_plus/connectivity_plus.dart';
+import 'dart:async';
+
 import '../../data/local/hive_helper.dart';
 import '../../data/remote/database_service.dart';
+import 'connectivity_service.dart';
 
 class SyncManager {
   static final SyncManager _instance = SyncManager._internal();
@@ -8,16 +10,22 @@ class SyncManager {
   SyncManager._internal();
 
   bool _isSyncing = false;
+  StreamSubscription<bool>? _connectivitySub;
 
   void init() {
-    Connectivity().onConnectivityChanged.listen((List<ConnectivityResult> results) {
-      if (results.isNotEmpty && !results.contains(ConnectivityResult.none)) {
+    // Subscribe ke ConnectivityService — hanya sync ketika status berubah
+    // menjadi online (transisi offline → online).
+    _connectivitySub?.cancel();
+    _connectivitySub = ConnectivityService().onStatusChanged.listen((isOnline) {
+      if (isOnline) {
         syncPendingRecords();
       }
     });
-    
-    // Coba sync saat pertama kali diinisialisasi
-    syncPendingRecords();
+
+    // Coba sync sekali saat pertama kali diinisialisasi (jika sudah online).
+    if (ConnectivityService().isOnline.value) {
+      syncPendingRecords();
+    }
   }
 
   Future<void> syncPendingRecords() async {

@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:async';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../viewmodel/jadwal_viewmodel.dart';
@@ -16,36 +14,15 @@ class JadwalScreen extends StatefulWidget {
 
 class _JadwalScreenState extends State<JadwalScreen> {
   final _vm = JadwalViewModel();
-  bool _isOnline = true;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
-    _initConnectivity();
-  }
-
-  Future<void> _initConnectivity() async {
-    final connectivity = Connectivity();
-    final result = await connectivity.checkConnectivity();
-    _updateConnectionStatus(result);
-    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
-      _updateConnectionStatus,
-    );
-  }
-
-  void _updateConnectionStatus(List<ConnectivityResult> result) {
-    if (!mounted) return;
-    setState(() {
-      _isOnline =
-          result.isNotEmpty && !result.contains(ConnectivityResult.none);
-    });
   }
 
   @override
   void dispose() {
-    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }

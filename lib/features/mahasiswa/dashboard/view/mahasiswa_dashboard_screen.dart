@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
 import '../../presensi/view/absensi_list_screen.dart';
@@ -12,7 +13,6 @@ import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import '../../../auth/view/widgets/logout_confirm_dialog.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -36,8 +36,6 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   int _currentNavIndex = 0;
   Timer? _pollingTimer;
   final Set<String> _notifiedJadwalIds = {};
-  bool _isOnline = true;
-  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
@@ -47,24 +45,6 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
     NotificationService().requestPermission();
     _startPolling();
-    _initConnectivity();
-  }
-
-  Future<void> _initConnectivity() async {
-    final connectivity = Connectivity();
-    final result = await connectivity.checkConnectivity();
-    _updateConnectionStatus(result);
-
-    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
-      _updateConnectionStatus,
-    );
-  }
-
-  void _updateConnectionStatus(List<ConnectivityResult> result) {
-    setState(() {
-      _isOnline =
-          result.isNotEmpty && !result.contains(ConnectivityResult.none);
-    });
   }
 
   void _startPolling() {
@@ -111,7 +91,6 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
-    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -303,42 +282,45 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   ),
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 12,
-                  vertical: 7,
-                ),
-                decoration: BoxDecoration(
-                  color: _isOnline
-                      ? Colors.white.withOpacity(0.24)
-                      : Colors.red.withOpacity(0.2),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: _isOnline
-                        ? AppColors.surface
-                        : Colors.red.withOpacity(0.5),
-                    width: 1,
+              ValueListenableBuilder<bool>(
+                valueListenable: ConnectivityService().isOnline,
+                builder: (_, isOnline, __) => Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 7,
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
-                      color: _isOnline ? AppColors.surface : Colors.red,
-                      size: 16,
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? Colors.white.withOpacity(0.24)
+                        : Colors.red.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isOnline
+                          ? AppColors.surface
+                          : Colors.red.withOpacity(0.5),
+                      width: 1,
                     ),
-                    SizedBox(width: 8),
-                    Text(
-                      _isOnline ? 'Online' : 'Offline',
-                      style: TextStyle(
-                        color: _isOnline ? AppColors.surface : Colors.red,
-                        fontFamily: 'Plus Jakarta Sans',
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                        color: isOnline ? AppColors.surface : Colors.red,
+                        size: 16,
                       ),
-                    ),
-                  ],
+                      SizedBox(width: 8),
+                      Text(
+                        isOnline ? 'Online' : 'Offline',
+                        style: TextStyle(
+                          color: isOnline ? AppColors.surface : Colors.red,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ],
