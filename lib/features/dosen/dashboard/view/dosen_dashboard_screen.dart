@@ -781,7 +781,6 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   Widget _buildMenuRow() {
     final menus = [
       {'icon': Icons.play_circle_outline, 'label': 'Sesi'},
-      {'icon': Icons.fact_check_outlined, 'label': 'Approval'},
       {'icon': Icons.edit_calendar, 'label': 'Ganti Jadwal'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
@@ -807,8 +806,6 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                       builder: (_) => RekapDosenScreen(user: widget.user),
                     ),
                   );
-                } else if (menu['label'] == 'Approval') {
-                  setState(() => _currentNavIndex = 2);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(

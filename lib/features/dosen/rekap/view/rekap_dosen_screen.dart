@@ -30,8 +30,10 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: [
+    return Scaffold(
+      backgroundColor: const Color(0xFFF6F6F6),
+      body: Column(
+        children: [
         Container(
           width: double.infinity,
           padding: const EdgeInsets.fromLTRB(24, 20, 24, 24),
@@ -246,6 +248,7 @@ class _RekapDosenScreenState extends State<RekapDosenScreen> {
           ),
         ),
       ],
+      ),
     );
   }
 }
