@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -96,28 +97,57 @@ class DatabaseService {
     return _db!;
   }
 
+  /// Mutex serial untuk operasi DB. mongo_dart tidak aman dipakai paralel dari
+  /// banyak Future di koneksi yang sama (apalagi saat retry — reconnect
+  /// menutup socket di tengah query lain → query yg lain hang/timeout).
+  /// Semua call _withReconnect akan antri lewat _opQueue.
+  Future<void> _opQueue = Future.value();
+
   /// Eksekusi operasi DB dengan retry sekali jika koneksi reset di tengah query.
   /// Atlas free tier sering tutup idle connection → method ini handle reconnect.
-  Future<T> _withReconnect<T>(Future<T> Function() op) async {
-    await connect();
-    try {
-      return await op();
-    } catch (e) {
-      final msg = e.toString();
-      final transient = msg.contains('ConnectionException') ||
-          msg.contains('reset by peer') ||
-          msg.contains('SocketException') ||
-          msg.contains('connection closed');
-      if (!transient) rethrow;
-
-      // Force reconnect lalu coba sekali lagi.
-      try { await _db?.close(); } catch (_) {}
-      _db = null;
-      _connectionFuture = null;
-      await Future.delayed(const Duration(milliseconds: 300));
-      await connect();
-      return op();
-    }
+  /// Operasi diserialisasi via _opQueue agar tidak ada race saat reconnect.
+  Future<T> _withReconnect<T>(Future<T> Function() op) {
+    final completer = Completer<T>();
+    final prev = _opQueue;
+    _opQueue = prev.then((_) async {
+      try {
+        await connect();
+        try {
+          final result = await op();
+          completer.complete(result);
+        } catch (e) {
+          print('[DBG ERR] _withReconnect caught: $e');
+          final msg = e.toString();
+          final transient = msg.contains('ConnectionException') ||
+              msg.contains('reset by peer') ||
+              msg.contains('SocketException') ||
+              msg.contains('connection closed');
+          if (!transient) {
+            print('[DBG ERR] non-transient, rethrowing');
+            completer.completeError(e);
+            return;
+          }
+          // Force reconnect lalu coba sekali lagi.
+          print('[DBG ERR] transient, retrying...');
+          try { await _db?.close(); } catch (_) {}
+          _db = null;
+          _connectionFuture = null;
+          await Future.delayed(const Duration(milliseconds: 300));
+          await connect();
+          try {
+            final result = await op();
+            completer.complete(result);
+          } catch (e2) {
+            print('[DBG ERR] retry failed: $e2');
+            completer.completeError(e2);
+          }
+        }
+      } catch (outer) {
+        // gagal connect / sesuatu di luar op
+        if (!completer.isCompleted) completer.completeError(outer);
+      }
+    });
+    return completer.future;
   }
 
   /// Bangun selector yang permissive terhadap field `periodeAkademikKode`:
@@ -297,16 +327,12 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getJadwalMahasiswa(String kelas, {String? program}) async {
     return _withReconnect(() async {
       final hari = getHariIni();
-      final periode = await getActivePeriode();
-      final periodeKode = periode?['kode'] as String?;
-
-      final base = <String, dynamic>{
+      final selector = <String, dynamic>{
         'kelas': kelas,
         'hari': hari,
         'isActive': true,
       };
-      if (program != null) base['program'] = program;
-      final selector = _withPeriodeFilter(base, periodeKode);
+      if (program != null) selector['program'] = program;
 
       final list = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
       list.sort((a, b) =>
@@ -317,15 +343,11 @@ class DatabaseService {
 
   Future<List<Map<String, dynamic>>> getSemuaJadwalMahasiswa(String kelas, {String? program}) async {
     return _withReconnect(() async {
-      final periode = await getActivePeriode();
-      final periodeKode = periode?['kode'] as String?;
-
-      final base = <String, dynamic>{
+      final selector = <String, dynamic>{
         'kelas': kelas,
         'isActive': true,
       };
-      if (program != null) base['program'] = program;
-      final selector = _withPeriodeFilter(base, periodeKode);
+      if (program != null) selector['program'] = program;
 
       final list = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
       const urut = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
@@ -367,11 +389,8 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getJadwalDosen(String dosenId) async {
     return _withReconnect(() async {
       final hari = getHariIni();
-      final periode = await getActivePeriode();
-      final periodeKode = periode?['kode'] as String?;
-
       // Match: dosenId / kodeDosen single, ATAU dosenIds array (team teaching).
-      final base = <String, dynamic>{
+      final selector = <String, dynamic>{
         r'$or': [
           {'kodeDosen': dosenId},
           {'dosenId': dosenId},
@@ -379,7 +398,6 @@ class DatabaseService {
         ],
         'hari': hari,
       };
-      final selector = _withPeriodeFilter(base, periodeKode);
 
       final reguler = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
 
@@ -417,17 +435,15 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllJadwalDosen(String dosenId) async {
     return _withReconnect(() async {
       print('[DBG] getAllJadwalDosen called with dosenId="$dosenId"');
-      final periode = await getActivePeriode();
-      final periodeKode = periode?['kode'] as String?;
-      print('[DBG] active periode kode: $periodeKode');
-      final base = <String, dynamic>{
+      // Selector simpel — tidak filter periode untuk avoid $and complexity di mongo_dart.
+      // Periode filter bisa ditambahkan kalau multi-periode aktif sudah didukung UI.
+      final selector = <String, dynamic>{
         r'$or': [
           {'kodeDosen': dosenId},
           {'dosenId': dosenId},
           {'dosenIds': dosenId},
         ],
       };
-      final selector = _withPeriodeFilter(base, periodeKode);
       final list = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
       print('[DBG] getAllJadwalDosen returned ${list.length} jadwal');
       if (list.isEmpty) {
