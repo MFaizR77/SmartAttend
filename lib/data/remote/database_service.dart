@@ -7,47 +7,70 @@ class DatabaseService {
   DatabaseService._internal();
 
   Db? _db;
-  bool _isConnecting = false;
+  Future<void>? _connectionFuture;
 
-  Future<void> connect() async {
-    // Jika sedang konek, tunggu sampai selesai
-    if (_isConnecting) {
-      while (_isConnecting) {
-        await Future.delayed(const Duration(milliseconds: 50));
-      }
-      if (_db != null && _db!.isConnected) return;
+  Future<void> connect() {
+    if (_connectionFuture != null) {
+      return _connectionFuture!;
     }
+    _connectionFuture = _doConnect();
+    return _connectionFuture!;
+  }
 
-    if (_db != null) {
-      if (_db!.state == State.OPENING) {
-        while (_db!.state == State.OPENING) {
-          await Future.delayed(const Duration(milliseconds: 50));
+  Future<void> _doConnect() async {
+    try {
+      if (_db != null) {
+        if (_db!.state == State.OPENING) {
+          // Tunggu sampai selesai opening
+          int waitCount = 0;
+          while (_db!.state == State.OPENING && waitCount < 100) {
+            await Future.delayed(const Duration(milliseconds: 50));
+            waitCount++;
+          }
         }
-        return;
-      }
-      if (_db!.isConnected) {
-        try {
-          await _db!.serverStatus();
-          return;
-        } catch (_) {
+
+        if (_db!.isConnected) {
+          try {
+            await _db!.serverStatus();
+            return; // Koneksi masih bagus
+          } catch (_) {
+            // Koneksi rusak, buang dan buat ulang
+            try { await _db!.close(); } catch (_) {}
+            _db = null;
+          }
+        } else {
+          // State CLOSED atau tidak connected — buang instance lama
+          try { await _db!.close(); } catch (_) {}
           _db = null;
         }
       }
-    }
-    
-    _isConnecting = true;
-    try {
-      final mongoUri = dotenv.env['MONGODB_URI'];
-      if (mongoUri == null || mongoUri.isEmpty) {
-        throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
+      
+      await _openNewConnection();
+    } catch (e) {
+      // Retry 1x jika ConnectionException (transient network error)
+      final msg = e.toString();
+      if (msg.contains('ConnectionException') || msg.contains('reset by peer') || msg.contains('SocketException')) {
+        try { _db?.close(); } catch (_) {}
+        _db = null;
+        await Future.delayed(const Duration(milliseconds: 300));
+        await _openNewConnection();
+      } else {
+        rethrow;
       }
-
-      _db = await Db.create(mongoUri);
-      await _db!.open(secure: true, tlsAllowInvalidCertificates: true);
-      print('✅ Berhasil terhubung ke MongoDB');
     } finally {
-      _isConnecting = false;
+      _connectionFuture = null;
     }
+  }
+
+  Future<void> _openNewConnection() async {
+    final mongoUri = dotenv.env['MONGODB_URI'];
+    if (mongoUri == null || mongoUri.isEmpty) {
+      throw Exception('MONGODB_URI tidak ditemukan. Pastikan sudah diset di .env atau tambahkan fallback url.');
+    }
+
+    _db = await Db.create(mongoUri);
+    await _db!.open(secure: true, tlsAllowInvalidCertificates: true);
+    print('Berhasil terhubung ke MongoDB');
   }
 
   Future<Map<String, dynamic>?> login(String identifier, String password) async {
@@ -111,34 +134,83 @@ class DatabaseService {
     return jadwal;
   }
 
+  /// Mengambil semua jadwal kuliah seminggu untuk mahasiswa berdasarkan kelas
+  Future<List<Map<String, dynamic>>> getSemuaJadwalMahasiswa(String kelas) async {
+    await connect();
+    final jadwalCollection = _db!.collection('jadwal_kuliah');
+
+    final cursor = jadwalCollection.find({
+      'kelas': kelas,
+      'isActive': true,
+    });
+
+    final List<Map<String, dynamic>> jadwal = await cursor.toList();
+    jadwal.sort((a, b) {
+      const urutan = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      final iA = urutan.indexOf(a['hari'] as String? ?? '');
+      final iB = urutan.indexOf(b['hari'] as String? ?? '');
+      if (iA != iB) return iA.compareTo(iB);
+      return (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? '');
+    });
+    return jadwal;
+  }
+
   /// Mengambil jadwal mengajar hari ini untuk dosen
   Future<List<Map<String, dynamic>>> getJadwalDosen(String dosenId) async {
     await connect();
     final hari = getHariIni();
     final jadwalCollection = _db!.collection('jadwal_kuliah');
+    final pengajuanCollection = _db!.collection('pengajuan_ganti_jadwal');
     
-    try {
+    Future<List<Map<String, dynamic>>> fetchJadwal() async {
       final cursor = jadwalCollection.find({
-        'dosenId': dosenId,
+        '\$or': [
+          {'kodeDosen': dosenId},
+          {'dosenId': dosenId}
+        ],
         'hari': hari,
-        'isActive': true,
       });
-      
-      final List<Map<String, dynamic>> jadwal = await cursor.toList();
-      jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
-      return jadwal;
+      final jadwalReguler = await cursor.toList();
+
+      final now = DateTime.now();
+      final startOfDay = DateTime(now.year, now.month, now.day);
+      final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+      final pengajuanCursor = pengajuanCollection.find({
+        'dosenId': dosenId,
+        'status': 'approved',
+        'tanggalPengganti': {
+          '\$gte': startOfDay.toIso8601String(),
+          '\$lte': endOfDay.toIso8601String(),
+        }
+      });
+      final pengajuan = await pengajuanCursor.toList();
+
+      final List<Map<String, dynamic>> jadwalPengganti = pengajuan.map((p) {
+        return {
+          '_id': p['_id'],
+          'namaMK': p['namaMK'] ?? 'Mata Kuliah',
+          'kelas': p['kelas'] ?? '',
+          'tipe': 'Pengganti',
+          'jamMulai': p['jamMulaiPengganti'] ?? '',
+          'jamSelesai': p['jamSelesaiPengganti'] ?? '',
+          'ruangan': p['ruanganPengganti'] ?? '',
+          'hari': hari,
+        };
+      }).toList();
+
+      final List<Map<String, dynamic>> semuaJadwal = [...jadwalReguler, ...jadwalPengganti];
+      semuaJadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
+      return semuaJadwal;
+    }
+
+    try {
+      return await fetchJadwal();
     } catch (e) {
       if (e.toString().contains('ConnectionException')) {
         _db = null;
         await connect();
-        final cursor = _db!.collection('jadwal_kuliah').find({
-          'dosenId': dosenId,
-          'hari': hari,
-          'isActive': true,
-        });
-        final List<Map<String, dynamic>> jadwal = await cursor.toList();
-        jadwal.sort((a, b) => (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
-        return jadwal;
+        return await fetchJadwal();
       }
       rethrow;
     }
@@ -151,8 +223,10 @@ class DatabaseService {
     
     try {
       final cursor = jadwalCollection.find({
-        'dosenId': dosenId,
-        'isActive': true,
+        '\$or': [
+          {'kodeDosen': dosenId},
+          {'dosenId': dosenId}
+        ]
       });
       
       final List<Map<String, dynamic>> jadwal = await cursor.toList();
@@ -168,8 +242,10 @@ class DatabaseService {
         _db = null;
         await connect();
         final cursor = _db!.collection('jadwal_kuliah').find({
-          'dosenId': dosenId,
-          'isActive': true,
+          '\$or': [
+            {'kodeDosen': dosenId},
+            {'dosenId': dosenId}
+          ]
         });
         final List<Map<String, dynamic>> jadwal = await cursor.toList();
         return jadwal;
@@ -266,13 +342,48 @@ class DatabaseService {
     final startOfDay = DateTime(now.year, now.month, now.day);
     final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
 
-    final record = await collection.findOne({
+    // Coba cari dengan tanggal sebagai BSON DateTime
+    var record = await collection.findOne({
       'jadwalId': jadwalId,
       'tanggal': {
         '\$gte': startOfDay,
         '\$lte': endOfDay,
       }
     });
+
+    // Jika tidak ditemukan, coba cari dengan tanggal sebagai ISO String
+    if (record == null) {
+      record = await collection.findOne({
+        'jadwalId': jadwalId,
+        'tanggal': {
+          '\$gte': startOfDay.toIso8601String(),
+          '\$lte': endOfDay.toIso8601String(),
+        }
+      });
+    }
+
+    // Fallback: cari tanpa filter tanggal, lalu cek manual
+    if (record == null) {
+      final allRecords = await collection.find({
+        'jadwalId': jadwalId,
+      }).toList();
+      
+      for (final r in allRecords) {
+        DateTime? tanggal;
+        if (r['tanggal'] is DateTime) {
+          tanggal = r['tanggal'];
+        } else if (r['tanggal'] is String) {
+          tanggal = DateTime.tryParse(r['tanggal']);
+        }
+        if (tanggal != null &&
+            tanggal.year == now.year &&
+            tanggal.month == now.month &&
+            tanggal.day == now.day) {
+          record = r;
+          break;
+        }
+      }
+    }
 
     if (record == null) return false;
     
@@ -404,6 +515,62 @@ class DatabaseService {
     // Urutkan berdasarkan nama ruangan
     hasil.sort((a, b) => (a['nama'] as String).compareTo(b['nama'] as String));
     return hasil;
+  }
+
+  /// Mengambil rincian pemakaian suatu ruangan pada tanggal tertentu
+  Future<List<Map<String, dynamic>>> getDetailJadwalRuangan(DateTime tanggal, String ruangan) async {
+    await connect();
+    
+    final hari = getHariFromDate(tanggal);
+    final jadwalCollection = _db!.collection('jadwal_kuliah');
+    
+    // 1. Jadwal reguler (match nama ruangan persis di awal, karena kadang ada - Gedung C)
+    final regulerTerpakai = await jadwalCollection.find({
+      'hari': hari,
+      'ruangan': {'\$regex': '^$ruangan'},
+    }).toList();
+
+    // 2. Jadwal pengganti
+    final startOfDay = DateTime(tanggal.year, tanggal.month, tanggal.day);
+    final endOfDay = DateTime(tanggal.year, tanggal.month, tanggal.day, 23, 59, 59);
+    
+    final pengajuanCollection = _db!.collection('pengajuan_ganti_jadwal');
+    final pengajuanTerpakai = await pengajuanCollection.find({
+      'tanggalPengganti': {
+        '\$gte': startOfDay.toIso8601String(),
+        '\$lte': endOfDay.toIso8601String(),
+      },
+      'status': {'\$in': ['pending', 'approved']},
+      'ruanganPengganti': {'\$regex': '^$ruangan'},
+    }).toList();
+
+    // 3. Gabungkan hasil
+    final List<Map<String, dynamic>> detailJadwal = [];
+    
+    for (var j in regulerTerpakai) {
+      detailJadwal.add({
+        'jamMulai': j['jamMulai'] ?? '',
+        'jamSelesai': j['jamSelesai'] ?? '',
+        'namaMK': j['namaMK'] ?? j['mataKuliah'] ?? 'Mata Kuliah',
+        'kelas': j['kelas'] ?? '',
+        'jenis': 'Reguler',
+      });
+    }
+
+    for (var p in pengajuanTerpakai) {
+      detailJadwal.add({
+        'jamMulai': p['jamMulaiPengganti'] ?? '',
+        'jamSelesai': p['jamSelesaiPengganti'] ?? '',
+        'namaMK': p['namaMK'] ?? 'Mata Kuliah',
+        'kelas': p['kelas'] ?? '',
+        'jenis': 'Pengganti',
+      });
+    }
+
+    // Urutkan berdasarkan jamMulai
+    detailJadwal.sort((a, b) => (a['jamMulai'] as String).compareTo(b['jamMulai'] as String));
+    
+    return detailJadwal;
   }
 
   /// Menyimpan pengajuan ganti jadwal dengan status pending

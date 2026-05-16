@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/admin_dashboard_viewmodel.dart';
@@ -25,15 +28,36 @@ class AdminDashboardScreen extends StatefulWidget {
 class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   final _vm = AdminDashboardViewModel();
   int _currentNavIndex = 0;
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    _updateConnectionStatus(result);
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> result) {
+    if (!mounted) return;
+    setState(() {
+      _isOnline =
+          result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    });
   }
 
   @override
   void dispose() {
+    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -42,22 +66,63 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _currentNavIndex,
-          children: [
-            _buildDashboardContent(bottomInset),
-            const ManajemenUserScreen(),
-            const ManajemenJadwalScreen(),
-            ProfilScreen(user: widget.user, onLogout: widget.onLogout),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Keluar Aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w700)),
+            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal', style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Keluar',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Plus Jakarta Sans')),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          bottom: false,
+          child: _buildCurrentScreen(bottomInset),
         ),
+        bottomNavigationBar: _buildBottomNav(bottomInset),
       ),
-      bottomNavigationBar: _buildBottomNav(bottomInset),
     );
+  }
+
+  Widget _buildCurrentScreen(double bottomInset) {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildDashboardContent(bottomInset);
+      case 1:
+        return const ManajemenUserScreen();
+      case 2:
+        return const ManajemenJadwalScreen();
+      case 3:
+        return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
+      default:
+        return _buildDashboardContent(bottomInset);
+    }
   }
 
   Widget _buildDashboardContent(double bottomInset) {
@@ -67,25 +132,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         Expanded(
           child: Container(
             color: AppColors.surface,
-            child: SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildOverviewCards(),
-                  const SizedBox(height: 24),
-                  _buildSectionTitle('Peringatan Sistem'),
-                  const SizedBox(height: 16),
-                  _buildAlertBanner(),
-                  const SizedBox(height: 34),
-                  _buildSectionTitle('Menu Cepat'),
-                  const SizedBox(height: 16),
-                  _buildMenuRow(),
-                  const SizedBox(height: 34),
-                  _buildSectionTitle('Aktivitas Terbaru'),
-                  const SizedBox(height: 16),
-                  _buildActivityLog(),
-                ],
+            child: RefreshIndicator(
+              onRefresh: () => _vm.loadData(),
+              color: AppColors.primaryBlue,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildOverviewCards(),
+                    const SizedBox(height: 24),
+                    _buildSectionTitle('Peringatan Sistem'),
+                    const SizedBox(height: 16),
+                    _buildAlertBanner(),
+                    const SizedBox(height: 34),
+                    _buildSectionTitle('Menu Cepat'),
+                    const SizedBox(height: 16),
+                    _buildMenuRow(),
+                    const SizedBox(height: 34),
+                    _buildSectionTitle('Aktivitas Terbaru'),
+                    const SizedBox(height: 16),
+                    _buildActivityLog(),
+                  ],
+                ),
               ),
             ),
           ),
@@ -99,20 +169,24 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       width: double.infinity,
       padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
       decoration: const BoxDecoration(
-        color: AppColors.brand,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
                   'Halo,\n${widget.user.nama}!',
                   style: const TextStyle(
-                    color: AppColors.primary,
+                    color: AppColors.surface,
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -120,37 +194,128 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                     letterSpacing: -0.6,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    widget.user.roleLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
+              ),
+              const SizedBox(width: 12),
+              _buildAvatar(widget.user.nama),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  widget.user.roleLabel,
+                  style: const TextStyle(
+                    color: AppColors.grayDark,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
                   ),
                 ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          IconButton(
-            onPressed: widget.onLogout,
-            splashRadius: 22,
-            icon: const Icon(Icons.logout_rounded, color: AppColors.primary, size: 26),
-            tooltip: 'Logout',
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: _isOnline
+                      ? Colors.white.withOpacity(0.24)
+                      : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isOnline
+                        ? AppColors.surface
+                        : Colors.red.withOpacity(0.5),
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                      color: _isOnline ? AppColors.surface : Colors.red,
+                      size: 14,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      _isOnline ? 'Online' : 'Offline',
+                      style: TextStyle(
+                        color: _isOnline ? AppColors.surface : Colors.red,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String name) {
+    final initials = _initials(name);
+    return Container(
+      width: 54,
+      height: 54,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF8003),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3949AB), Color(0xFF1A237E)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return 'U';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    final first = parts[0].substring(0, 1);
+    final second = parts[1].substring(0, 1);
+    return '$first$second'.toUpperCase();
   }
 
   Widget _buildOverviewCards() {
@@ -159,14 +324,33 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       builder: (_, stats, child) {
         if (stats.isEmpty) return const SizedBox.shrink();
         return GridView.count(
-          crossAxisCount: 2, shrinkWrap: true,
+          crossAxisCount: 2,
+          shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          crossAxisSpacing: 12, mainAxisSpacing: 12, childAspectRatio: 1.4,
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.4,
           children: [
-            _buildOverviewCard('Total Mahasiswa', '${stats['totalMahasiswa']}', AppColors.accent),
-            _buildOverviewCard('Total Dosen', '${stats['totalDosen']}', AppColors.primary),
-            _buildOverviewCard('Sesi Hari Ini', '${stats['sesiHariIni']}', AppColors.success),
-            _buildOverviewCard('Kehadiran', '${stats['tingkatKehadiran']}%', AppColors.warning),
+            _buildOverviewCard(
+              'Total Mahasiswa',
+              '${stats['totalMahasiswa']}',
+              AppColors.accent,
+            ),
+            _buildOverviewCard(
+              'Total Dosen',
+              '${stats['totalDosen']}',
+              AppColors.primary,
+            ),
+            _buildOverviewCard(
+              'Sesi Hari Ini',
+              '${stats['sesiHariIni']}',
+              AppColors.success,
+            ),
+            _buildOverviewCard(
+              'Kehadiran',
+              '${stats['tingkatKehadiran']}%',
+              AppColors.warning,
+            ),
           ],
         );
       },
@@ -179,7 +363,9 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
         border: Border.all(color: AppColors.border, width: 2),
-        boxShadow: const [BoxShadow(color: Color(0x19000000), blurRadius: 12, spreadRadius: -6)],
+        boxShadow: const [
+          BoxShadow(color: Color(0x19000000), blurRadius: 12, spreadRadius: -6),
+        ],
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
@@ -232,7 +418,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       ),
       child: Row(
         children: [
-          const Icon(Icons.warning_amber_rounded, color: AppColors.warning, size: 24),
+          const Icon(
+            Icons.warning_amber_rounded,
+            color: AppColors.warning,
+            size: 24,
+          ),
           const SizedBox(width: 12),
           Expanded(
             child: Text(
@@ -266,15 +456,28 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             child: GestureDetector(
               onTap: () {
                 if (menu['label'] == 'Approval') {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const ApprovalJadwalScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const ApprovalJadwalScreen(),
+                    ),
+                  );
                 } else if (menu['label'] == 'Users') {
                   setState(() => _currentNavIndex = 1);
                 } else if (menu['label'] == 'Jadwal') {
                   setState(() => _currentNavIndex = 2);
                 } else if (menu['label'] == 'Rekap') {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const RekapAdminScreen()));
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const RekapAdminScreen()),
+                  );
                 } else {
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Fitur ini belum tersedia'), duration: Duration(seconds: 1)));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Fitur ini belum tersedia'),
+                      duration: Duration(seconds: 1),
+                    ),
+                  );
                 }
               },
               child: Column(
@@ -286,15 +489,30 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                       color: Colors.white,
                       borderRadius: BorderRadius.circular(24),
                       border: Border.all(color: AppColors.border),
-                      boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0C000000),
+                          blurRadius: 2,
+                          offset: Offset(0, 1),
+                        ),
+                      ],
                     ),
-                    child: Icon(menu['icon'] as IconData, color: AppColors.primary, size: 30),
+                    child: Icon(
+                      menu['icon'] as IconData,
+                      color: AppColors.primary,
+                      size: 30,
+                    ),
                   ),
                   const SizedBox(height: 10),
                   Text(
                     menu['label'] as String,
                     textAlign: TextAlign.center,
-                    style: const TextStyle(color: AppColors.textSecondary, fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w700),
+                    style: const TextStyle(
+                      color: AppColors.textSecondary,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontSize: 13,
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
                 ],
               ),
@@ -315,7 +533,13 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(color: AppColors.border),
-            boxShadow: const [BoxShadow(color: Color(0x0C000000), blurRadius: 2, offset: Offset(0, 1))],
+            boxShadow: const [
+              BoxShadow(
+                color: Color(0x0C000000),
+                blurRadius: 2,
+                offset: Offset(0, 1),
+              ),
+            ],
           ),
           child: Column(
             children: logs.asMap().entries.map((entry) {
@@ -324,19 +548,37 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
               return Column(
                 children: [
                   ListTile(
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 4,
+                    ),
                     dense: true,
-                    leading: const Icon(Icons.circle, size: 10, color: AppColors.brand),
+                    leading: const Icon(
+                      Icons.circle,
+                      size: 10,
+                      color: AppColors.primaryBlue,
+                    ),
                     title: Text(
                       log['aksi'] ?? '',
-                      style: const TextStyle(fontFamily: 'Plus Jakarta Sans', fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.primary),
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: AppColors.primary,
+                      ),
                     ),
                     trailing: Text(
                       log['waktu'] ?? '',
-                      style: const TextStyle(fontFamily: 'Plus Jakarta Sans', fontSize: 12, fontWeight: FontWeight.w500, color: AppColors.textSecondary),
+                      style: const TextStyle(
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                        color: AppColors.textSecondary,
+                      ),
                     ),
                   ),
-                  if (!isLast) const Divider(height: 1, indent: 16, endIndent: 16),
+                  if (!isLast)
+                    const Divider(height: 1, indent: 16, endIndent: 16),
                 ],
               );
             }).toList(),
@@ -348,7 +590,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
 
   Widget _buildBottomNav(double bottomInset) {
     final items = [
-      {'icon': Icons.dashboard, 'label': 'Dashboard'},
+      {'icon': Icons.home_outlined, 'label': 'Dashboard'},
       {'icon': Icons.people, 'label': 'Users'},
       {'icon': Icons.calendar_today, 'label': 'Jadwal'},
       {'icon': Icons.account_circle_outlined, 'label': 'Profil'},
@@ -375,13 +617,17 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   Icon(
                     item['icon'] as IconData,
                     size: 24,
-                    color: _currentNavIndex == i ? AppColors.brand : const Color(0xFF9CA3AF),
+                    color: _currentNavIndex == i
+                        ? AppColors.primaryBlue
+                        : const Color(0xFF9CA3AF),
                   ),
                   const SizedBox(height: 4),
                   Text(
                     item['label'] as String,
                     style: TextStyle(
-                      color: _currentNavIndex == i ? AppColors.brand : const Color(0xFF9CA3AF),
+                      color: _currentNavIndex == i
+                          ? AppColors.primaryBlue
+                          : const Color(0xFF9CA3AF),
                       fontFamily: 'Plus Jakarta Sans',
                       fontSize: 10,
                       fontWeight: FontWeight.w700,

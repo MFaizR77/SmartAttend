@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
-import '../../presensi/view/presensi_screen.dart';
+import '../../presensi/view/absensi_list_screen.dart';
 import '../../jadwal/view/jadwal_screen.dart';
 import '../../rekap/view/rekap_screen.dart';
 import '../../../profil/view/profil_screen.dart';
@@ -10,6 +11,8 @@ import 'dart:async';
 import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import '../../../auth/view/widgets/logout_confirm_dialog.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 
 /// Dashboard utama mahasiswa.
 /// Menampilkan statistik, jadwal hari ini, dan menu cepat.
@@ -33,21 +36,35 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   int _currentNavIndex = 0;
   Timer? _pollingTimer;
   final Set<String> _notifiedJadwalIds = {};
-
-  static const Color _ink = Color(0xFF1A1A1A);
-  static const Color _softText = Color(0xFF6B7280);
-  static const Color _surface = Color(0xFFF8F8F8);
-  static const Color _stroke = Color(0xFFF3F4F6);
-  static const Color _brand = Color(0xFFD0FF00);
+  bool _isOnline = true;
+  StreamSubscription<List<ConnectivityResult>>? _connectivitySubscription;
 
   @override
   void initState() {
     super.initState();
     _vm.loadData(widget.user);
-    
+
     // Meminta izin notifikasi kepada mahasiswa (terutama untuk Android 13+)
     NotificationService().requestPermission();
     _startPolling();
+    _initConnectivity();
+  }
+
+  Future<void> _initConnectivity() async {
+    final connectivity = Connectivity();
+    final result = await connectivity.checkConnectivity();
+    _updateConnectionStatus(result);
+
+    _connectivitySubscription = connectivity.onConnectivityChanged.listen(
+      _updateConnectionStatus,
+    );
+  }
+
+  void _updateConnectionStatus(List<ConnectivityResult> result) {
+    setState(() {
+      _isOnline =
+          result.isNotEmpty && !result.contains(ConnectivityResult.none);
+    });
   }
 
   void _startPolling() {
@@ -59,14 +76,14 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
       for (final jadwal in jadwalHariIni) {
         final jadwalId = jadwal['id'] ?? '';
         final namaMK = jadwal['mataKuliah'] ?? 'Kelas';
-        
+
         if (jadwalId.isEmpty || _notifiedJadwalIds.contains(jadwalId)) continue;
-        
+
         try {
           final isBuka = await DatabaseService().isKelasBerjalan(jadwalId);
           if (isBuka && mounted) {
             _notifiedJadwalIds.add(jadwalId);
-            
+
             // Tampilkan Notifikasi
             await NotificationService().flutterLocalNotificationsPlugin.show(
               jadwalId.hashCode,
@@ -94,6 +111,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   @override
   void dispose() {
     _pollingTimer?.cancel();
+    _connectivitySubscription?.cancel();
     _vm.dispose();
     super.dispose();
   }
@@ -102,22 +120,63 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Widget build(BuildContext context) {
     final bottomInset = MediaQuery.of(context).padding.bottom;
 
-    return Scaffold(
-      backgroundColor: AppColors.background,
-      body: SafeArea(
-        bottom: false,
-        child: IndexedStack(
-          index: _currentNavIndex,
-          children: [
-            _buildDashboardContent(bottomInset),
-            JadwalScreen(user: widget.user),
-            RekapScreen(user: widget.user),
-            ProfilScreen(user: widget.user, onLogout: widget.onLogout),
-          ],
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        final shouldExit = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('Keluar Aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w700)),
+            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?',
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Batal', style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.primaryBlue,
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                ),
+                child: const Text('Keluar',
+                  style: TextStyle(color: Colors.white, fontFamily: 'Plus Jakarta Sans')),
+              ),
+            ],
+          ),
+        );
+        if (shouldExit == true) {
+          SystemNavigator.pop();
+        }
+      },
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: SafeArea(
+          bottom: false,
+          child: _buildCurrentScreen(bottomInset),
         ),
+        bottomNavigationBar: _buildBottomNav(bottomInset),
       ),
-      bottomNavigationBar: _buildBottomNav(bottomInset),
     );
+  }
+
+  Widget _buildCurrentScreen(double bottomInset) {
+    switch (_currentNavIndex) {
+      case 0:
+        return _buildDashboardContent(bottomInset);
+      case 1:
+        return JadwalScreen(user: widget.user);
+      case 2:
+        return AbsensiListScreen(user: widget.user);
+      case 3:
+        return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
+      default:
+        return _buildDashboardContent(bottomInset);
+    }
   }
 
   Widget _buildDashboardContent(double bottomInset) {
@@ -128,50 +187,54 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             _buildTopHeader(),
             Expanded(
               child: Container(
-                color: _surface,
-                child: SingleChildScrollView(
-                  padding: EdgeInsets.fromLTRB(
-                    24,
-                    24,
-                    24,
-                    124 + bottomInset,
-                  ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      _buildStatistik(),
-                      const SizedBox(height: 24),
+                color: AppColors.dashboardSurface,
+                child: RefreshIndicator(
+                  onRefresh: () => _vm.loadData(widget.user),
+                  color: AppColors.primaryBlue,
+                  child: SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    padding: EdgeInsets.fromLTRB(24, 24, 24, 124 + bottomInset),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildStatistik(),
+                        const SizedBox(height: 24),
 
-                      _buildSectionTitle('Jadwal Asli'),
-                      const SizedBox(height: 16),
-                      _buildJadwalList(),
+                        _buildSectionTitle('Jadwal Hari Ini'),
+                        const SizedBox(height: 16),
+                        _buildJadwalList(),
 
-                      ValueListenableBuilder<List<Map<String, String>>>(
-                        valueListenable: _vm.jadwalPenggantiHariIni,
-                        builder: (context, pengganti, _) {
-                          if (pengganti.isEmpty) return const SizedBox.shrink();
-                          return Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const SizedBox(height: 24),
-                              _buildSectionTitle('Jadwal Pengganti'),
-                              const SizedBox(height: 16),
-                              ...pengganti.map((j) {
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: _buildJadwalCard(j, isPengganti: true),
-                                );
-                              }),
-                            ],
-                          );
-                        },
-                      ),
+                        ValueListenableBuilder<List<Map<String, String>>>(
+                          valueListenable: _vm.jadwalPenggantiHariIni,
+                          builder: (context, pengganti, _) {
+                            if (pengganti.isEmpty)
+                              return const SizedBox.shrink();
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                const SizedBox(height: 24),
+                                _buildSectionTitle('Jadwal Pengganti'),
+                                const SizedBox(height: 16),
+                                ...pengganti.map((j) {
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 12),
+                                    child: _buildJadwalCard(
+                                      j,
+                                      isPengganti: true,
+                                    ),
+                                  );
+                                }),
+                              ],
+                            );
+                          },
+                        ),
 
-                      const SizedBox(height: 34),
-                      _buildSectionTitle('Menu Cepat'),
-                      const SizedBox(height: 16),
-                      _buildMenuRow(),
-                    ],
+                        const SizedBox(height: 34),
+                        _buildSectionTitle('Menu Cepat'),
+                        const SizedBox(height: 16),
+                        _buildMenuRow(),
+                      ],
+                    ),
                   ),
                 ),
               ),
@@ -185,22 +248,26 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
   Widget _buildTopHeader() {
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(24, 20, 24, 48),
+      padding: const EdgeInsets.fromLTRB(24, 20, 24, 40),
       decoration: const BoxDecoration(
-        color: _brand,
-        borderRadius: BorderRadius.vertical(bottom: Radius.circular(22)),
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
       ),
-      child: Row(
+      child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              Expanded(
+                child: Text(
                   'Halo,\n${widget.user.nama}!',
                   style: const TextStyle(
-                    color: _ink,
+                    color: AppColors.surface,
                     fontFamily: 'Plus Jakarta Sans',
                     fontWeight: FontWeight.w800,
                     height: 1.1,
@@ -208,55 +275,64 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     letterSpacing: -0.6,
                   ),
                 ),
-                const SizedBox(height: 14),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
-                  decoration: BoxDecoration(
-                    color: _ink,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    widget.user.roleLabel,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      height: 1.2,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              IconButton(
-                onPressed: widget.onLogout,
-                splashRadius: 22,
-                icon: const Icon(Icons.logout_rounded, color: _ink, size: 26),
-                tooltip: 'Logout',
               ),
-              const SizedBox(height: 34),
+              _buildAvatar(widget.user.nama),
+            ],
+          ),
+          const SizedBox(height: 20),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.24),
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: _ink, width: 1),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 7,
                 ),
-                child: const Row(
+                decoration: BoxDecoration(
+                  color: AppColors.surface,
+                  borderRadius: BorderRadius.circular(999),
+                ),
+                child: Text(
+                  widget.user.roleLabel,
+                  style: const TextStyle(
+                    color: AppColors.grayDark,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontSize: 13,
+                    fontWeight: FontWeight.w700,
+                    height: 1.2,
+                  ),
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 7,
+                ),
+                decoration: BoxDecoration(
+                  color: _isOnline
+                      ? Colors.white.withOpacity(0.24)
+                      : Colors.red.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: _isOnline
+                        ? AppColors.surface
+                        : Colors.red.withOpacity(0.5),
+                    width: 1,
+                  ),
+                ),
+                child: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.wifi_off_rounded, color: _ink, size: 16),
+                    Icon(
+                      _isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                      color: _isOnline ? AppColors.surface : Colors.red,
+                      size: 16,
+                    ),
                     SizedBox(width: 8),
                     Text(
-                      'Offline',
+                      _isOnline ? 'Online' : 'Offline',
                       style: TextStyle(
-                        color: _ink,
+                        color: _isOnline ? AppColors.surface : Colors.red,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 14,
                         fontWeight: FontWeight.w700,
@@ -299,7 +375,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: _ink, width: 2),
+          border: Border.all(color: AppColors.grayDark, width: 2),
           boxShadow: const [
             BoxShadow(
               color: Color(0x19000000),
@@ -316,7 +392,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
               Text(
                 value,
                 style: const TextStyle(
-                  color: _ink,
+                  color: AppColors.grayDark,
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 50,
                   fontWeight: FontWeight.w800,
@@ -345,11 +421,12 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     return Text(
       title,
       style: const TextStyle(
-        color: _ink,
+        color: AppColors.grayDark,
         fontFamily: 'Plus Jakarta Sans',
-        fontSize: 36,
+        fontSize: 20,
         fontWeight: FontWeight.w800,
-        height: 1.1,
+        letterSpacing: -0.5,
+        height: 1.2,
       ),
     );
   }
@@ -365,12 +442,12 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: _stroke),
+              border: Border.all(color: AppColors.stroke),
             ),
             child: const Text(
               'Tidak ada jadwal hari ini',
               style: TextStyle(
-                color: _softText,
+                color: AppColors.softText,
                 fontFamily: 'Plus Jakarta Sans',
                 fontSize: 14,
                 fontWeight: FontWeight.w500,
@@ -391,24 +468,21 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
     );
   }
 
-  Widget _buildJadwalCard(Map<String, String> jadwal, {bool isPengganti = false}) {
+  Widget _buildJadwalCard(
+    Map<String, String> jadwal, {
+    bool isPengganti = false,
+  }) {
     final cardColor = isPengganti ? Colors.blue.shade50 : Colors.white;
-    final iconColor = isPengganti ? Colors.blue : _ink;
-    final iconBgColor = isPengganti ? Colors.blue.shade100 : const Color(0x33D0FF00);
+    final iconColor = isPengganti ? Colors.blue : AppColors.primaryBlue;
+    final iconBgColor = isPengganti
+        ? Colors.blue.shade100
+        : AppColors.primaryBlue.withOpacity(0.2);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => PresensiScreen(
-                jadwal: jadwal,
-                user: widget.user,
-              ),
-            ),
-          );
+          setState(() => _currentNavIndex = 2);
         },
         child: Container(
           width: double.infinity,
@@ -416,7 +490,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
           decoration: BoxDecoration(
             color: cardColor,
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: _stroke),
+            border: Border.all(color: AppColors.stroke),
             boxShadow: const [
               BoxShadow(
                 color: Color(0x0C000000),
@@ -434,8 +508,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                   color: iconBgColor,
                   borderRadius: BorderRadius.circular(12),
                 ),
-                child:
-                    Icon(Icons.computer_outlined, color: iconColor, size: 24),
+                child: Icon(
+                  Icons.computer_outlined,
+                  color: iconColor,
+                  size: 24,
+                ),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -447,7 +524,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
-                        color: _ink,
+                        color: AppColors.grayDark,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 15,
                         fontWeight: FontWeight.w700,
@@ -458,7 +535,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     Text(
                       '${jadwal['jam'] ?? '-'} • ${jadwal['ruang'] ?? '-'}',
                       style: const TextStyle(
-                        color: _softText,
+                        color: AppColors.softText,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 13,
                         fontWeight: FontWeight.w500,
@@ -469,7 +546,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 ),
               ),
               const SizedBox(width: 8),
-              const Icon(Icons.chevron_right_rounded, color: _ink, size: 22),
+              const Icon(
+                Icons.chevron_right_rounded,
+                color: AppColors.grayDark,
+                size: 22,
+              ),
             ],
           ),
         ),
@@ -495,8 +576,21 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 onTap: () {
                   if (menu['label'] == 'Jadwal') {
                     setState(() => _currentNavIndex = 1);
-                  } else if (menu['label'] == 'Rekap') {
+                  } else if (menu['label'] == 'Presensi') {
                     setState(() => _currentNavIndex = 2);
+                  } else if (menu['label'] == 'Rekap') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => Scaffold(
+                          backgroundColor: const Color(0xFFF6F6F6),
+                          body: SafeArea(
+                            bottom: false,
+                            child: RekapScreen(user: widget.user),
+                          ),
+                        ),
+                      ),
+                    );
                   } else {
                     _showComingSoon(context);
                   }
@@ -509,7 +603,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: _stroke),
+                        border: Border.all(color: AppColors.stroke),
                         boxShadow: const [
                           BoxShadow(
                             color: Color(0x0C000000),
@@ -520,7 +614,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                       ),
                       child: Icon(
                         menu['icon'] as IconData,
-                        color: _ink,
+                        color: AppColors.grayDark,
                         size: 30,
                       ),
                     ),
@@ -554,9 +648,9 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
 
     return Container(
       padding: EdgeInsets.fromLTRB(24, 14, 24, 14 + bottomInset),
-      decoration: const BoxDecoration(
+      decoration: BoxDecoration(
         color: Colors.white,
-        border: Border(top: BorderSide(color: _stroke)),
+        border: Border(top: BorderSide(color: AppColors.stroke)),
       ),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -574,16 +668,17 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     Icon(
                       items[i]['icon'] as IconData,
                       size: 24,
-                      color:
-                          _currentNavIndex == i ? _brand : const Color(0xFF9CA3AF),
+                      color: _currentNavIndex == i
+                          ? AppColors.primaryBlue
+                          : AppColors.grayLight,
                     ),
                     const SizedBox(height: 4),
                     Text(
                       items[i]['label'] as String,
                       style: TextStyle(
                         color: _currentNavIndex == i
-                            ? _brand
-                            : const Color(0xFF9CA3AF),
+                            ? AppColors.primaryBlue
+                            : AppColors.grayLight,
                         fontFamily: 'Plus Jakarta Sans',
                         fontSize: 10,
                         fontWeight: FontWeight.w700,
@@ -597,6 +692,57 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String name) {
+    final initials = _initials(name);
+    return Container(
+      width: 54,
+      height: 54,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF8003),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3949AB), Color(0xFF1A237E)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return 'U';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    final first = parts[0].substring(0, 1);
+    final second = parts[1].substring(0, 1);
+    return '$first$second'.toUpperCase();
   }
 
   void _showComingSoon(BuildContext context) {

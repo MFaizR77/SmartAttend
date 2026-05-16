@@ -57,6 +57,94 @@ class PilihRuanganScreen extends StatelessWidget {
     );
   }
 
+  void _tampilkanDetailRuangan(BuildContext context, String namaRuang) {
+    showModalBottomSheet(
+      context: context,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Detail Jadwal Ruang $namaRuang', style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: AppColors.primary)),
+              const SizedBox(height: 4),
+              Text(DateFormat('EEEE, dd MMMM yyyy').format(tanggal), style: const TextStyle(color: AppColors.textSecondary)),
+              const Divider(height: 24),
+              Expanded(
+                child: FutureBuilder<List<Map<String, dynamic>>>(
+                  future: vm.getDetailRuangan(tanggal, namaRuang),
+                  builder: (context, snapshot) {
+                    if (snapshot.connectionState == ConnectionState.waiting) {
+                      return const Center(child: CircularProgressIndicator());
+                    }
+                    if (snapshot.hasError) {
+                      return Center(child: Text('Gagal memuat jadwal: ${snapshot.error}', style: const TextStyle(color: AppColors.error)));
+                    }
+                    final list = snapshot.data ?? [];
+                    if (list.isEmpty) {
+                      return const Center(child: Text('Tidak ada jadwal pada hari ini (Mungkin sedang di-booking untuk kegiatan lain).', textAlign: TextAlign.center, style: TextStyle(color: AppColors.textSecondary)));
+                    }
+                    return ListView.builder(
+                      itemCount: list.length,
+                      itemBuilder: (context, index) {
+                        final j = list[index];
+                        final isPengganti = j['jenis'] == 'Pengganti';
+                        return Card(
+                          margin: const EdgeInsets.only(bottom: 12),
+                          elevation: 0,
+                          color: isPengganti ? Colors.orange.shade50 : AppColors.surface,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: isPengganti ? Colors.orange.shade200 : AppColors.border),
+                          ),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppColors.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                  ),
+                                  child: Text('${j['jamMulai']} - ${j['jamSelesai']}', style: const TextStyle(fontWeight: FontWeight.bold, color: AppColors.primary, fontSize: 13)),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(j['namaMK'], style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      const SizedBox(height: 4),
+                                      Text('Kelas: ${j['kelas']}', style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                      if (isPengganti)
+                                        Container(
+                                          margin: const EdgeInsets.only(top: 4),
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(color: Colors.orange.shade100, borderRadius: BorderRadius.circular(4)),
+                                          child: const Text('Kelas Pengganti', style: TextStyle(color: Colors.deepOrange, fontSize: 10, fontWeight: FontWeight.bold)),
+                                        ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        );
+                      },
+                    );
+                  },
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -114,7 +202,7 @@ class PilihRuanganScreen extends StatelessWidget {
                     final isTerpakai = r['isTerpakai'] as bool;
 
                     return InkWell(
-                      onTap: isTerpakai ? null : () => _konfirmasiPilih(context, nama),
+                      onTap: isTerpakai ? () => _tampilkanDetailRuangan(context, nama) : () => _konfirmasiPilih(context, nama),
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         decoration: BoxDecoration(

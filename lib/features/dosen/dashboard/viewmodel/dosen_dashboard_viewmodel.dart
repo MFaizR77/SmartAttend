@@ -29,9 +29,11 @@ class DosenDashboardViewModel {
       
       final mappedJadwal = jadwalDB.map((doc) {
         return {
-          'mataKuliah': '${doc['namaMK']} (${doc['kelas']} - ${doc['tipe']})',
+          'id': doc['_id']?.toString() ?? '',
+          'mataKuliah': '${doc['namaMK']} (${doc['kelas']})',
           'jam': '${doc['jamMulai']} - ${doc['jamSelesai']}',
           'ruang': doc['ruangan']?.toString() ?? '-',
+          'tipe': doc['tipe']?.toString() ?? 'Reguler',
         };
       }).toList();
 
