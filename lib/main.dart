@@ -3,8 +3,14 @@ import 'core/theme/app_theme.dart';
 import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
+import 'features/mahasiswa/izin/view/izin_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
+import 'features/dosen/tindak_lanjut_izin/view/tindak_lanjut_screen.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
+import 'features/admin/upload_jadwal/view/upload_jadwal_screen.dart';
+import 'features/admin/manajemen_periode/view/manajemen_periode_screen.dart';
+import 'features/admin/assign_wali/view/assign_wali_screen.dart';
+import 'features/walidosen/dashboard/view/walidosen_dashboard_screen.dart';
 import 'features/onboarding/view/onboarding_screen.dart';
 import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
@@ -12,7 +18,6 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
-import 'core/services/connectivity_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
 
 Future<void> main() async {
@@ -21,35 +26,34 @@ Future<void> main() async {
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
 
-  // Inisialisasi monitor konektivitas (sumber tunggal status online/offline)
-  await ConnectivityService().init();
-
   // Inisialisasi proses sinkronisasi background
   SyncManager().init();
-  
+
   // Inisialisasi notifikasi & timezone
   tz.initializeTimeZones();
   await NotificationService().init();
-  
+
   final authViewModel = AuthViewModel();
   final hasSession = await authViewModel.checkOfflineSession();
 
-  // Tentukan initialRoute SEBELUM runApp — bukan di dalam build().
-  // MaterialApp hanya membaca initialRoute sekali saat pertama dibuat.
   String initialRoute;
   if (hasSession && authViewModel.currentUser.value != null) {
-    final role = authViewModel.currentUser.value!.role;
-    if (role == UserRole.mahasiswa) {
-      initialRoute = '/mahasiswa';
-    } else if (role == UserRole.dosen) {
-      initialRoute = '/dosen';
-    } else if (role == UserRole.admin) {
-      initialRoute = '/admin';
-    } else {
-      initialRoute = '/login';
+    final acc = authViewModel.currentUser.value!.accountType;
+    switch (acc) {
+      case AccountType.mahasiswa:
+        initialRoute = '/mahasiswa';
+        break;
+      case AccountType.dosen:
+        initialRoute = '/dosen';
+        break;
+      case AccountType.walidosen:
+        initialRoute = '/walidosen';
+        break;
+      case AccountType.admin:
+        initialRoute = '/admin';
+        break;
     }
   } else {
-    // Belum login → tampilkan onboarding
     initialRoute = '/onboarding';
   }
 
@@ -59,7 +63,6 @@ Future<void> main() async {
   ));
 }
 
-/// Root widget aplikasi SmartAttend.
 class SmartAttendApp extends StatefulWidget {
   final AuthViewModel authViewModel;
   final String initialRoute;
@@ -89,7 +92,6 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
     super.dispose();
   }
 
-  /// Logout — reset state dan kembali ke login.
   void _handleLogout(BuildContext context) async {
     await _authViewModel.logout();
     if (context.mounted) {
@@ -136,6 +138,16 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
               ),
             );
 
+          case '/walidosen':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (ctx) => WaliDosenDashboardScreen(
+                user: user,
+                onLogout: () => _handleLogout(ctx),
+              ),
+            );
+
           case '/admin':
             final user = _authViewModel.currentUser.value;
             if (user == null) return _redirectToLogin();
@@ -146,6 +158,41 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
               ),
             );
 
+          case '/mahasiswa/izin':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => IzinScreen(user: user),
+            );
+
+          case '/dosen/tindak-lanjut-izin':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => TindakLanjutIzinScreen(user: user),
+            );
+
+          case '/admin/upload-jadwal':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => UploadJadwalScreen(user: user),
+            );
+
+          case '/admin/periode':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => ManajemenPeriodeScreen(user: user),
+            );
+
+          case '/admin/assign-wali':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => AssignWaliScreen(user: user),
+            );
+
           default:
             return _redirectToLogin();
         }
@@ -153,7 +200,6 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
     );
   }
 
-  /// Fallback: redirect ke login jika route tidak dikenal atau user null.
   MaterialPageRoute _redirectToLogin() {
     return MaterialPageRoute(
       builder: (_) => LoginScreen(authViewModel: _authViewModel),

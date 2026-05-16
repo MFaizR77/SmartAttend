@@ -113,6 +113,12 @@ class ProfilScreen extends StatelessWidget {
                     ],
                   ),
                   const SizedBox(height: 20),
+                  _buildSectionLabel('FITUR'),
+                  const SizedBox(height: 10),
+                  _buildCard(
+                    children: _buildActionsForRole(context, user),
+                  ),
+                  const SizedBox(height: 20),
                   _buildCard(
                     children: [
                       _buildActionRow(
@@ -405,6 +411,80 @@ class ProfilScreen extends StatelessWidget {
     );
   }
 
+  List<Widget> _buildActionsForRole(BuildContext context, User user) {
+    Widget menuRow({
+      required IconData icon,
+      required String title,
+      required String subtitle,
+      required String route,
+      Color? titleColor,
+    }) {
+      return _buildActionRow(
+        icon: icon,
+        iconBg: AppColors.primaryBlue.withOpacity(0.2),
+        title: title,
+        subtitle: subtitle,
+        titleColor: titleColor ?? const Color(0xFF212121),
+        onTap: () => Navigator.pushNamed(context, route),
+      );
+    }
+
+    switch (user.accountType) {
+      case AccountType.mahasiswa:
+        return [
+          menuRow(
+            icon: Icons.event_note_outlined,
+            title: 'Ajukan Izin/Sakit',
+            subtitle: 'Kirim ke wali dosen untuk approval',
+            route: '/mahasiswa/izin',
+          ),
+        ];
+      case AccountType.dosen:
+        return [
+          menuRow(
+            icon: Icons.fact_check_outlined,
+            title: 'Tindak Lanjut Izin',
+            subtitle: 'Tandai izin/sakit/alpha mahasiswa',
+            route: '/dosen/tindak-lanjut-izin',
+          ),
+        ];
+      case AccountType.walidosen:
+        return [
+          _buildInfoRow(
+            icon: Icons.supervisor_account_outlined,
+            iconBg: AppColors.primaryBlue.withOpacity(0.2),
+            title: 'Mode Wali Dosen',
+            subtitle: 'Approval izin tersedia di dashboard utama',
+          ),
+        ];
+      case AccountType.admin:
+        return [
+          menuRow(
+            icon: Icons.upload_file_outlined,
+            title: 'Upload Jadwal',
+            subtitle: 'Import jadwal dari CSV',
+            route: '/admin/upload-jadwal',
+          ),
+          _buildDivider(),
+          menuRow(
+            icon: Icons.calendar_month_outlined,
+            title: 'Manajemen Periode',
+            subtitle: 'Aktifkan / buat periode akademik',
+            route: '/admin/periode',
+          ),
+          _buildDivider(),
+          menuRow(
+            icon: Icons.supervisor_account_outlined,
+            title: 'Assign Wali Dosen',
+            subtitle: 'Buat akun wali untuk kelas',
+            route: '/admin/assign-wali',
+          ),
+        ];
+    }
+  }
+
+  }
+
   String _initials(String fullName) {
     final trimmed = fullName.trim();
     if (trimmed.isEmpty) return 'U';
@@ -423,4 +503,3 @@ class ProfilScreen extends StatelessWidget {
       ),
     );
   }
-}

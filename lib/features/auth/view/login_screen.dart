@@ -4,8 +4,7 @@ import '../../../data/local/models/user.dart';
 import '../viewmodel/auth_viewmodel.dart';
 import 'widgets/login_form.dart';
 
-/// Halaman login SmartAttend.
-/// Satu form untuk semua role — sistem auto-detect dari credential.
+/// Halaman login SmartAttend dengan dropdown role.
 class LoginScreen extends StatefulWidget {
   final AuthViewModel authViewModel;
 
@@ -21,7 +20,6 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    // Navigasi otomatis saat login berhasil
     _vm.currentUser.addListener(_onUserChanged);
   }
 
@@ -35,20 +33,21 @@ class _LoginScreenState extends State<LoginScreen> {
     final user = _vm.currentUser.value;
     if (user == null) return;
 
-    // Redirect ke dashboard sesuai role
     String route;
-    switch (user.role) {
-      case UserRole.mahasiswa:
+    switch (user.accountType) {
+      case AccountType.mahasiswa:
         route = '/mahasiswa';
         break;
-      case UserRole.dosen:
+      case AccountType.dosen:
         route = '/dosen';
         break;
-      case UserRole.admin:
+      case AccountType.walidosen:
+        route = '/walidosen';
+        break;
+      case AccountType.admin:
         route = '/admin';
         break;
     }
-
     Navigator.of(context).pushReplacementNamed(route);
   }
 
@@ -59,7 +58,7 @@ class _LoginScreenState extends State<LoginScreen> {
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 72),
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 48),
             child: ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 448),
               child: Column(
@@ -67,7 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 crossAxisAlignment: CrossAxisAlignment.center,
                 spacing: 32,
                 children: [
-                  // ── Header: SMARTATTEND + subtitle ──
+                  // Header
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.center,
                     spacing: 8,
@@ -115,11 +114,11 @@ class _LoginScreenState extends State<LoginScreen> {
                     ],
                   ),
 
-                  // ── Card form login ──
+                  // Card form
                   Container(
                     width: double.infinity,
                     padding: const EdgeInsets.only(
-                      top: 40,
+                      top: 32,
                       left: 32,
                       right: 32,
                       bottom: 32,
@@ -127,10 +126,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     decoration: ShapeDecoration(
                       color: Colors.white,
                       shape: RoundedRectangleBorder(
-                        side: const BorderSide(
-                          width: 2,
-                          color: AppColors.grayDark,
-                        ),
+                        side: const BorderSide(width: 2, color: AppColors.grayDark),
                         borderRadius: BorderRadius.circular(8),
                       ),
                     ),
@@ -143,8 +139,12 @@ class _LoginScreenState extends State<LoginScreen> {
                             return LoginForm(
                               isLoading: isLoading,
                               errorMessage: errorMsg,
-                              onLogin: (identifier, password) {
-                                _vm.login(identifier, password);
+                              onLogin: (role, identifier, password) {
+                                _vm.loginAs(
+                                  accountType: role,
+                                  identifier: identifier,
+                                  password: password,
+                                );
                               },
                             );
                           },
@@ -152,34 +152,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                   ),
-
-                  // ── Info box akun testing (hapus di production) ──
-                  // Container(
-                  //   width: double.infinity,
-                  //   padding: const EdgeInsets.all(16),
-                  //   decoration: ShapeDecoration(
-                  //     color: AppColors.skyBlue,
-                  //     shape: RoundedRectangleBorder(
-                  //       side: const BorderSide(
-                  //         width: 2,
-                  //         color: AppColors.grayDark,
-                  //       ),
-                  //       borderRadius: BorderRadius.circular(4),
-                  //     ),
-                  //   ),
-                  //   child: const Text(
-                  //     'Mahasiswa: 241511033 (Pass: *PassMhs033#)\n'
-                  //     'Dosen: KO009N (Pass: \$2b\$10\$defaultHashForDosen123)\n'
-                  //     'Gunakan sesuai data di database.',
-                  //     style: TextStyle(
-                  //       color: AppColors.royalBlue,
-                  //       fontSize: 10,
-                  //       fontFamily: 'Plus Jakarta Sans',
-                  //       fontWeight: FontWeight.w400,
-                  //       height: 1.25,
-                  //     ),
-                  //   ),
-                  // ),
                 ],
               ),
             ),

@@ -1,18 +1,20 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../data/local/models/user.dart';
 
-/// Form login reusable dengan desain baru (retro style).
-/// Hanya UI — logika login dipanggil via callback [onLogin].
+/// Form login dengan dropdown role (mahasiswa/dosen/walidosen/admin).
 class LoginForm extends StatefulWidget {
   final bool isLoading;
   final String? errorMessage;
-  final void Function(String identifier, String password) onLogin;
+  final void Function(AccountType accountType, String identifier, String password) onLogin;
+  final AccountType initialRole;
 
   const LoginForm({
     super.key,
     required this.isLoading,
     required this.onLogin,
     this.errorMessage,
+    this.initialRole = AccountType.mahasiswa,
   });
 
   @override
@@ -24,6 +26,13 @@ class _LoginFormState extends State<LoginForm> {
   final _identifierController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _obscurePassword = true;
+  late AccountType _selectedRole;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedRole = widget.initialRole;
+  }
 
   @override
   void dispose() {
@@ -34,17 +43,38 @@ class _LoginFormState extends State<LoginForm> {
 
   void _submit() {
     if (!_formKey.currentState!.validate()) return;
-    widget.onLogin(_identifierController.text.trim(), _passwordController.text);
+    widget.onLogin(
+      _selectedRole,
+      _identifierController.text.trim(),
+      _passwordController.text,
+    );
   }
 
-  // ── Shared border decoration ──────────────────────────────────────
+  String _hintForRole(AccountType r) {
+    switch (r) {
+      case AccountType.mahasiswa: return 'Masukkan NIM';
+      case AccountType.dosen: return 'Masukkan kode dosen (mis. KO009N)';
+      case AccountType.walidosen: return 'Masukkan kode wali dosen (mis. WD_KO071N_2B_D3)';
+      case AccountType.admin: return 'Masukkan kode admin';
+    }
+  }
+
+  String _labelForRole(AccountType r) {
+    switch (r) {
+      case AccountType.mahasiswa: return 'Mahasiswa';
+      case AccountType.dosen: return 'Dosen';
+      case AccountType.walidosen: return 'Wali Dosen';
+      case AccountType.admin: return 'Admin';
+    }
+  }
+
+  // ── Shared border ──────────────────────────────────────────────────
   OutlineInputBorder _border({Color color = AppColors.grayDark}) =>
       OutlineInputBorder(
         borderRadius: BorderRadius.circular(4),
         borderSide: BorderSide(width: 2, color: color),
       );
 
-  // ── Shared label style ────────────────────────────────────────────
   static const TextStyle _labelStyle = TextStyle(
     color: AppColors.grayDark,
     fontSize: 12,
@@ -54,7 +84,6 @@ class _LoginFormState extends State<LoginForm> {
     letterSpacing: 1.20,
   );
 
-  // ── Shared hint / input style ─────────────────────────────────────
   static const TextStyle _hintStyle = TextStyle(
     color: Color(0xFF6B7280),
     fontSize: 16,
@@ -76,6 +105,45 @@ class _LoginFormState extends State<LoginForm> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // ── ROLE SELECTOR ────────────────────────────────────────
+          const Text('LOGIN SEBAGAI', style: _labelStyle),
+          const SizedBox(height: 8),
+          Container(
+            decoration: BoxDecoration(
+              color: AppColors.surface,
+              borderRadius: BorderRadius.circular(4),
+              border: Border.all(width: 2, color: AppColors.grayDark),
+            ),
+            padding: const EdgeInsets.symmetric(horizontal: 12),
+            child: DropdownButtonHideUnderline(
+              child: DropdownButton<AccountType>(
+                isExpanded: true,
+                value: _selectedRole,
+                style: _inputStyle,
+                icon: const Icon(Icons.arrow_drop_down, color: AppColors.grayDark),
+                items: AccountType.values.map((role) {
+                  return DropdownMenuItem(
+                    value: role,
+                    child: Row(
+                      children: [
+                        Icon(_iconForRole(role), size: 20, color: AppColors.grayDark),
+                        const SizedBox(width: 12),
+                        Text(_labelForRole(role)),
+                      ],
+                    ),
+                  );
+                }).toList(),
+                onChanged: widget.isLoading
+                    ? null
+                    : (v) {
+                        if (v != null) setState(() => _selectedRole = v);
+                      },
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
           // ── USERNAME ─────────────────────────────────────────────
           const Text('USERNAME', style: _labelStyle),
           const SizedBox(height: 8),
@@ -85,7 +153,7 @@ class _LoginFormState extends State<LoginForm> {
             textInputAction: TextInputAction.next,
             style: _inputStyle,
             decoration: InputDecoration(
-              hintText: 'Masukkan username',
+              hintText: _hintForRole(_selectedRole),
               hintStyle: _hintStyle,
               prefixIcon: const Icon(
                 Icons.person_outline,
@@ -94,21 +162,13 @@ class _LoginFormState extends State<LoginForm> {
               ),
               filled: true,
               fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               enabledBorder: _border(),
               focusedBorder: _border(),
               errorBorder: _border(color: Colors.red),
               focusedErrorBorder: _border(color: Colors.red),
             ),
-            validator: (value) {
-              if (value == null || value.trim().isEmpty) {
-                return 'Username tidak boleh kosong';
-              }
-              return null;
-            },
+            validator: (v) => (v == null || v.trim().isEmpty) ? 'Username tidak boleh kosong' : null,
           ),
 
           const SizedBox(height: 24),
@@ -132,36 +192,24 @@ class _LoginFormState extends State<LoginForm> {
               ),
               suffixIcon: IconButton(
                 icon: Icon(
-                  _obscurePassword
-                      ? Icons.visibility_outlined
-                      : Icons.visibility_off_outlined,
+                  _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
                   color: AppColors.grayDark,
                   size: 20,
                 ),
-                onPressed: () =>
-                    setState(() => _obscurePassword = !_obscurePassword),
+                onPressed: () => setState(() => _obscurePassword = !_obscurePassword),
               ),
               filled: true,
               fillColor: AppColors.surface,
-              contentPadding: const EdgeInsets.symmetric(
-                horizontal: 16,
-                vertical: 14,
-              ),
+              contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               enabledBorder: _border(),
               focusedBorder: _border(),
               errorBorder: _border(color: Colors.red),
               focusedErrorBorder: _border(color: Colors.red),
             ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return 'Password tidak boleh kosong';
-              }
-              return null;
-            },
+            validator: (v) => (v == null || v.isEmpty) ? 'Password tidak boleh kosong' : null,
           ),
 
           const SizedBox(height: 16),
-          // ── Pesan error ───────────────────────────────────────────
           if (widget.errorMessage != null) ...[
             Container(
               width: double.infinity,
@@ -191,10 +239,8 @@ class _LoginFormState extends State<LoginForm> {
             const SizedBox(height: 16),
           ],
 
-          // Spasi panjang untuk menekan tombol ke bawah
-          const SizedBox(height: 60),
+          const SizedBox(height: 40),
 
-          // ── Tombol MASUK ─────────────────────────────────────────
           GestureDetector(
             onTap: widget.isLoading ? null : _submit,
             child: AnimatedContainer(
@@ -205,9 +251,7 @@ class _LoginFormState extends State<LoginForm> {
                 color: widget.isLoading
                     ? AppColors.primaryBlue.withValues(alpha: 0.55)
                     : AppColors.primaryBlue,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               ),
               child: Center(
                 child: widget.isLoading
@@ -237,5 +281,14 @@ class _LoginFormState extends State<LoginForm> {
         ],
       ),
     );
+  }
+
+  IconData _iconForRole(AccountType r) {
+    switch (r) {
+      case AccountType.mahasiswa: return Icons.school_outlined;
+      case AccountType.dosen: return Icons.person_outline;
+      case AccountType.walidosen: return Icons.supervisor_account_outlined;
+      case AccountType.admin: return Icons.admin_panel_settings_outlined;
+    }
   }
 }
