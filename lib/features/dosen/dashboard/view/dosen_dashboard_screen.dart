@@ -8,8 +8,9 @@ import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
 import '../../sesi/view/sesi_dosen_screen.dart';
 import '../../pergantian_jadwal/view/pergantian_jadwal_screen.dart';
 import '../../../profil/view/profil_screen.dart';
-import '../../rekap/view/rekap_dosen_screen.dart'; // We will create this
+import '../../rekap/view/rekap_dosen_screen.dart';
 import '../../approval/view/approval_screen.dart';
+import '../../izin/view/izin_dosen_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
   final User user;
@@ -545,6 +546,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
     final menus = [
       {'icon': Icons.play_circle_outline, 'label': 'Sesi'},
       {'icon': Icons.fact_check_outlined, 'label': 'Approval'},
+      {'icon': Icons.event_busy_outlined, 'label': 'Izin/Sakit'},
       {'icon': Icons.edit_calendar, 'label': 'Ganti Jadwal'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
@@ -557,12 +559,9 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
             child: GestureDetector(
               onTap: () {
                 if (menu['label'] == 'Ganti Jadwal') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => PergantianJadwalScreen(user: widget.user),
-                    ),
-                  );
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => PergantianJadwalScreen(user: widget.user)));
+                } else if (menu['label'] == 'Izin/Sakit') {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => IzinDosenScreen(user: widget.user)));
                 } else if (menu['label'] == 'Rekap') {
                   setState(() => _currentNavIndex = 1);
                 } else if (menu['label'] == 'Approval') {
