@@ -842,6 +842,11 @@ class DatabaseService {
   }
 
   /// List izin yang menunggu approval wali untuk kelas tertentu.
+  ///
+  /// Filter `program` dibuat permissive: match dokumen yang `program == [program]`
+  /// ATAU yang `program` null/missing. Ini mengantisipasi kasus dokumen mahasiswa
+  /// tidak punya field `program` (sehingga izin yang ia submit `program: null`),
+  /// padahal akun wali dosen punya `program: 'D3'`.
   Future<List<Map<String, dynamic>>> getIzinPendingByWali({
     required String kelas,
     String? program,
@@ -851,8 +856,21 @@ class DatabaseService {
         'kelas': kelas,
         'status': 'pending_wali',
       };
-      if (program != null) selector['program'] = program;
-      final list = await _requireDb.collection('izin_mahasiswa').find(selector).toList();
+      final finalSelector = program == null
+          ? selector
+          : {
+              r'$and': [
+                ...selector.entries.map((e) => {e.key: e.value}),
+                {
+                  r'$or': [
+                    {'program': program},
+                    {'program': null},
+                  ],
+                },
+              ],
+            };
+      final list = await _requireDb.collection('izin_mahasiswa').find(finalSelector).toList();
+      print('[getIzinPendingByWali] kelas=$kelas program=$program → ${list.length} doc');
       list.sort((a, b) {
         final ta = a['createdAt'] is DateTime ? (a['createdAt'] as DateTime) : DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(0);
         final tb = b['createdAt'] is DateTime ? (b['createdAt'] as DateTime) : DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(0);
@@ -863,14 +881,28 @@ class DatabaseService {
   }
 
   /// List izin (riwayat) untuk wali tanpa filter status — buat tab riwayat.
+  /// Filter `program` permissive (lihat catatan di [getIzinPendingByWali]).
   Future<List<Map<String, dynamic>>> getAllIzinByKelas({
     required String kelas,
     String? program,
   }) async {
     return _withReconnect(() async {
       final selector = <String, dynamic>{'kelas': kelas};
-      if (program != null) selector['program'] = program;
-      final list = await _requireDb.collection('izin_mahasiswa').find(selector).toList();
+      final finalSelector = program == null
+          ? selector
+          : {
+              r'$and': [
+                ...selector.entries.map((e) => {e.key: e.value}),
+                {
+                  r'$or': [
+                    {'program': program},
+                    {'program': null},
+                  ],
+                },
+              ],
+            };
+      final list = await _requireDb.collection('izin_mahasiswa').find(finalSelector).toList();
+      print('[getAllIzinByKelas] kelas=$kelas program=$program → ${list.length} doc');
       list.sort((a, b) {
         final ta = a['createdAt'] is DateTime ? (a['createdAt'] as DateTime) : DateTime.tryParse(a['createdAt']?.toString() ?? '') ?? DateTime(0);
         final tb = b['createdAt'] is DateTime ? (b['createdAt'] as DateTime) : DateTime.tryParse(b['createdAt']?.toString() ?? '') ?? DateTime(0);
@@ -1286,5 +1318,157 @@ class DatabaseService {
       'alpha': alpha,
       'total': hadir + izin + sakit + alpha,
     };
+  }
+
+  // ─────────────────────────────────────────────────────
+  // ADMIN: KENAIKAN KELAS / SEMESTER
+  // ─────────────────────────────────────────────────────
+
+  /// Ambil semua mahasiswa (untuk listing & filter).
+  Future<List<Map<String, dynamic>>> getAllMahasiswa() async {
+    return _withReconnect(() async {
+      final list = await _requireDb.collection('mahasiswa').find().toList();
+      list.sort((a, b) =>
+          (a['nama']?.toString() ?? '').compareTo(b['nama']?.toString() ?? ''));
+      return list;
+    });
+  }
+
+  /// Ambil daftar kelas unik dari koleksi mahasiswa.
+  /// Return list of { 'kelas': '2B', 'program': 'D3', 'jumlah': 25 }.
+  Future<List<Map<String, dynamic>>> getDistinctKelas() async {
+    return _withReconnect(() async {
+      final allMhs = await _requireDb.collection('mahasiswa').find().toList();
+      final groups = <String, Map<String, dynamic>>{};
+      for (final m in allMhs) {
+        final kelas = m['kelas']?.toString() ?? '';
+        final program = m['program']?.toString() ?? '';
+        if (kelas.isEmpty) continue;
+        final key = '${kelas}_$program';
+        if (!groups.containsKey(key)) {
+          groups[key] = {'kelas': kelas, 'program': program, 'jumlah': 0};
+        }
+        groups[key]!['jumlah'] = (groups[key]!['jumlah'] as int) + 1;
+      }
+      final list = groups.values.toList();
+      list.sort((a, b) {
+        final cmp = (a['program'] as String).compareTo(b['program'] as String);
+        if (cmp != 0) return cmp;
+        return (a['kelas'] as String).compareTo(b['kelas'] as String);
+      });
+      return list;
+    });
+  }
+
+  /// Promosikan semua mahasiswa dari [kelasLama] ke [kelasBaru].
+  /// Juga update semester jika [semesterBaru] diberikan.
+  /// Update juga wali_dosen yang kelasWali-nya sama.
+  /// Auto-enroll mahasiswa ke jadwal kelas baru di periode aktif.
+  /// Return jumlah mahasiswa, wali, dan enrollment yang di-update/dibuat.
+  Future<Map<String, int>> promosikanKelas({
+    required String kelasLama,
+    required String programFilter,
+    required String kelasBaru,
+    int? semesterBaru,
+  }) async {
+    return _withReconnect(() async {
+      final mhsColl = _requireDb.collection('mahasiswa');
+      final waliColl = _requireDb.collection('wali_dosen');
+      final enrollColl = _requireDb.collection('enrollments');
+      final jadwalColl = _requireDb.collection('jadwal_kuliah');
+
+      // 1. Update semua mahasiswa di kelas lama + program
+      final selector = <String, dynamic>{
+        'kelas': kelasLama,
+      };
+      if (programFilter.isNotEmpty) {
+        selector['program'] = programFilter;
+      }
+
+      final mhsList = await mhsColl.find(selector).toList();
+      int updatedMhs = 0;
+
+      for (final mhs in mhsList) {
+        final mods = modify.set('kelas', kelasBaru).set('updatedAt', DateTime.now());
+        if (semesterBaru != null) {
+          mods.set('semester', semesterBaru);
+        }
+        await mhsColl.update(where.id(mhs['_id']), mods);
+        updatedMhs++;
+      }
+
+      // 2. Update wali_dosen yang kelasWali == kelasLama
+      final waliSelector = <String, dynamic>{
+        'kelasWali': kelasLama,
+      };
+      if (programFilter.isNotEmpty) {
+        waliSelector['program'] = programFilter;
+      }
+      final waliList = await waliColl.find(waliSelector).toList();
+      int updatedWali = 0;
+
+      for (final wali in waliList) {
+        await waliColl.update(
+          where.id(wali['_id']),
+          modify.set('kelasWali', kelasBaru).set('updatedAt', DateTime.now()),
+        );
+        updatedWali++;
+      }
+
+      // 3. Auto-enroll ke jadwal kelas baru di periode aktif
+      int createdEnrollments = 0;
+      final periode = await _getActivePeriodeRaw();
+      final periodeKode = periode?['kode'] as String?;
+
+      if (periodeKode != null) {
+        // Cari semua jadwal yang cocok dengan kelas baru + program di periode aktif
+        final jadwalSelector = <String, dynamic>{
+          'kelas': kelasBaru,
+          'isActive': true,
+        };
+        if (programFilter.isNotEmpty) {
+          jadwalSelector['program'] = programFilter;
+        }
+        // Filter periode: match persis ATAU null/missing
+        final jadwalList = await jadwalColl.find(
+          _withPeriodeFilter(jadwalSelector, periodeKode),
+        ).toList();
+
+        print('[promosikanKelas] Found ${jadwalList.length} jadwal for $kelasBaru-$programFilter in periode $periodeKode');
+
+        if (jadwalList.isNotEmpty) {
+          for (final mhs in mhsList) {
+            final mhsId = mhs['_id'].toString();
+            for (final jadwal in jadwalList) {
+              final jadwalId = jadwal['_id'].toString();
+              final enrollId = '${periodeKode}_${mhsId}_$jadwalId';
+
+              // Cek apakah enrollment sudah ada (hindari duplikat)
+              final existing = await enrollColl.findOne(where.eq('_id', enrollId));
+              if (existing == null) {
+                await enrollColl.insertOne({
+                  '_id': enrollId,
+                  'mahasiswaId': mhsId,
+                  'jadwalId': jadwalId,
+                  'periodeAkademikKode': periodeKode,
+                  'status': 'aktif',
+                  'createdAt': DateTime.now(),
+                  'updatedAt': DateTime.now(),
+                });
+                createdEnrollments++;
+              }
+            }
+          }
+        }
+      }
+
+      print('[promosikanKelas] Updated: $updatedMhs mhs, $updatedWali wali, $createdEnrollments enrollments');
+
+      return {
+        'mahasiswa': updatedMhs,
+        'waliDosen': updatedWali,
+        'enrollments': createdEnrollments,
+      };
+    });
   }
 }

@@ -9,6 +9,7 @@ import '../../../profil/view/profil_screen.dart';
 import '../../manajemen_user/view/manajemen_user_screen.dart';
 import '../../manajemen_jadwal/view/manajemen_jadwal_screen.dart';
 import '../../rekap/view/rekap_admin_screen.dart';
+import '../../kenaikan_kelas/view/kenaikan_kelas_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final User user;
@@ -426,6 +427,7 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       {'icon': Icons.people, 'label': 'Users'},
       {'icon': Icons.domain_verification, 'label': 'Approval'},
       {'icon': Icons.calendar_month, 'label': 'Jadwal'},
+      {'icon': Icons.school_rounded, 'label': 'Kenaikan'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
 
@@ -447,6 +449,11 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
                   setState(() => _currentNavIndex = 1);
                 } else if (menu['label'] == 'Jadwal') {
                   setState(() => _currentNavIndex = 2);
+                } else if (menu['label'] == 'Kenaikan') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (_) => const KenaikanKelasScreen()),
+                  );
                 } else if (menu['label'] == 'Rekap') {
                   Navigator.push(
                     context,

@@ -96,7 +96,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       case 1:
         return RekapDosenScreen(user: widget.user);
       case 2:
-        return const ApprovalScreen();
+        return ApprovalScreen(user: widget.user);
       case 3:
         return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
       default:
