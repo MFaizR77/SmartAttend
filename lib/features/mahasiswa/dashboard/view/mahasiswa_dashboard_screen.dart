@@ -106,24 +106,72 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         final shouldExit = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('Keluar Aplikasi?',
-              style: TextStyle(fontFamily: 'Plus Jakarta Sans', fontWeight: FontWeight.w700)),
-            content: const Text('Apakah Anda yakin ingin keluar dari aplikasi?',
-              style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(context, false),
-                child: const Text('Batal', style: TextStyle(fontFamily: 'Plus Jakarta Sans')),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            actionsAlignment: MainAxisAlignment.center,
+            title: const Text(
+              'Keluar Aplikasi?',
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontFamily: 'Plus Jakarta Sans',
+                fontWeight: FontWeight.w700,
               ),
-              ElevatedButton(
-                onPressed: () => Navigator.pop(context, true),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: AppColors.primaryBlue,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+            ),
+            content: const Text(
+              'Apakah Anda yakin ingin keluar dari aplikasi?',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontFamily: 'Plus Jakarta Sans'),
+            ),
+            actions: [
+              SizedBox(
+                width: 110,
+                height: 40,
+                child: OutlinedButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Text(
+                    'Batal',
+                    style: TextStyle(
+                      color: AppColors.primaryBlue,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
                 ),
-                child: const Text('Keluar',
-                  style: TextStyle(color: Colors.white, fontFamily: 'Plus Jakarta Sans')),
+              ),
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 110,
+                height: 40,
+                child: ElevatedButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primaryBlue,
+                    foregroundColor: Colors.white,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    padding: EdgeInsets.zero,
+                  ),
+                  child: const Text(
+                    'Keluar',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                  ),
+                ),
               ),
             ],
           ),
@@ -134,10 +182,7 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
       },
       child: Scaffold(
         backgroundColor: AppColors.background,
-        body: SafeArea(
-          bottom: false,
-          child: _buildCurrentScreen(bottomInset),
-        ),
+        body: SafeArea(bottom: false, child: _buildCurrentScreen(bottomInset)),
         bottomNavigationBar: _buildBottomNav(bottomInset),
       ),
     );
