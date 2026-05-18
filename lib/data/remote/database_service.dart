@@ -527,6 +527,147 @@ class DatabaseService {
   // PRESENSI (legacy — tetap pakai record_presensi, sesiId = jadwalId)
   // ─────────────────────────────────────────────────────
 
+  /// Mengambil status presensi semua mahasiswa untuk satu sesi (jadwalId + hari ini).
+  /// Status: 'belum' | 'hadir' | 'izin' | 'sakit' | 'alpha'
+  Future<List<Map<String, dynamic>>> getStatusPresensiMahasiswaByJadwal(String jadwalId) async {
+    await connect();
+
+    // 1. Ambil daftar mahasiswa terdaftar di jadwal ini
+    final enrollments = await _requireDb.collection('enrollments').find({
+      'jadwalId': jadwalId,
+      'status': 'aktif',
+    }).toList();
+
+    if (enrollments.isEmpty) return [];
+
+    final mahasiswaIds = enrollments
+        .map((e) => e['mahasiswaId']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+
+    // 2. Ambil nama mahasiswa
+    final mahasiswaList = await _requireDb.collection('mahasiswa').find({
+      '_id': {r'$in': mahasiswaIds},
+    }).toList();
+    final Map<String, String> namaMap = {
+      for (var m in mahasiswaList)
+        m['_id']?.toString() ?? '': m['nama']?.toString() ?? m['name']?.toString() ?? '-',
+    };
+
+    // 3. Ambil record presensi hari ini untuk sesi ini
+    final now = DateTime.now();
+    final startOfDay = DateTime(now.year, now.month, now.day);
+    final endOfDay = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    final presensiRaw = await _requireDb.collection('record_presensi').find({
+      'sesiId': jadwalId,
+    }).toList();
+
+    // Filter hari ini secara manual (handle DateTime & String)
+    final Map<String, String> presensiMap = {};
+    for (final p in presensiRaw) {
+      final mahId = p['mahasiswaId']?.toString() ?? '';
+      if (mahId.isEmpty) continue;
+      final ts = p['timestamp'];
+      DateTime? tsDate;
+      if (ts is DateTime) tsDate = ts;
+      else if (ts is String) tsDate = DateTime.tryParse(ts);
+      if (tsDate == null) continue;
+      if (tsDate.isBefore(startOfDay) || tsDate.isAfter(endOfDay)) continue;
+      final status = p['status']?.toString() ?? 'hadir';
+      presensiMap[mahId] = status;
+    }
+
+    // 4. Ambil izin/sakit yang berlaku hari ini dan menyertakan jadwalId ini
+    final izinRaw = await _requireDb.collection('izin_mahasiswa').find({
+      'jadwalIdsTerdampak': {r'$in': [jadwalId]},
+      'status': {r'$in': ['approved_wali', 'closed']},
+    }).toList();
+
+    final Map<String, String> izinMap = {};
+    for (final izin in izinRaw) {
+      final mahId = izin['mahasiswaId']?.toString() ?? '';
+      if (mahId.isEmpty) continue;
+      final tgl = izin['tanggalIzin'];
+      DateTime? tglDate;
+      if (tgl is DateTime) tglDate = tgl;
+      else if (tgl is String) tglDate = DateTime.tryParse(tgl);
+      if (tglDate == null) continue;
+      if (tglDate.year == now.year && tglDate.month == now.month && tglDate.day == now.day) {
+        izinMap[mahId] = izin['jenis']?.toString() ?? 'izin';
+      }
+    }
+
+    // 5. Gabungkan hasil
+    final result = mahasiswaIds.map((nim) {
+      String status = 'belum';
+      if (presensiMap.containsKey(nim)) {
+        final s = presensiMap[nim]!;
+        // Status dari record_presensi bisa: hadir, alpha, izin, sakit (manual dosen)
+        status = (s == 'hadir' || s == 'alpha' || s == 'izin' || s == 'sakit') ? s : 'hadir';
+      } else if (izinMap.containsKey(nim)) {
+        // Izin dari wali/mahasiswa
+        status = izinMap[nim]!;
+      }
+      return {
+        'nim': nim,
+        'nama': namaMap[nim] ?? nim,
+        'status': status,
+      };
+    }).toList();
+
+    result.sort((a, b) => (a['nama'] as String).compareTo(b['nama'] as String));
+    return result;
+  }
+
+  /// Menandai status mahasiswa secara manual oleh dosen.
+  /// status: 'alpha' | 'izin' | 'sakit' | 'hapus' (hapus = kembali ke Belum Absen)
+  Future<void> tandaiStatusMahasiswaByDosen(String jadwalId, String mahasiswaId, String status) async {
+    await connect();
+    final coll = _requireDb.collection('record_presensi');
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    // Cari record yang sudah ada hari ini
+    final allToday = await coll.find({'sesiId': jadwalId, 'mahasiswaId': mahasiswaId}).toList();
+    Map<String, dynamic>? existing;
+    for (final r in allToday) {
+      final ts = r['timestamp'];
+      DateTime? tsDate;
+      if (ts is DateTime) tsDate = ts;
+      else if (ts is String) tsDate = DateTime.tryParse(ts);
+      if (tsDate != null && !tsDate.isBefore(start) && !tsDate.isAfter(end)) {
+        existing = r;
+        break;
+      }
+    }
+
+    if (existing != null) {
+      if (status == 'hapus') {
+        // Hapus record manual (kembali ke "Belum Absen") — hanya hapus jika markedByDosen
+        if (existing['markedByDosen'] == true) {
+          await coll.deleteOne({'_id': existing['_id']});
+        }
+      } else {
+        await coll.updateOne(
+          {'_id': existing['_id']},
+          {r'$set': {'status': status, 'markedByDosen': true, 'updatedAt': now}},
+        );
+      }
+    } else if (status != 'hapus') {
+      await coll.insertOne({
+        '_id': ObjectId(),
+        'sesiId': jadwalId,
+        'mahasiswaId': mahasiswaId,
+        'status': status,
+        'timestamp': now,
+        'createdAt': now,
+        'markedByDosen': true,
+      });
+    }
+  }
+
   Future<void> insertRecordPresensi(Map<String, dynamic> record) async {
     await connect();
     final coll = _requireDb.collection('record_presensi');
