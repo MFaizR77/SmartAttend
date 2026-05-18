@@ -143,7 +143,7 @@ class _OnboardingScreenState extends State<OnboardingScreen> {
             key: ValueKey<bool>(isLast),
             textAlign: TextAlign.center,
             style: const TextStyle(
-              color: AppColors.charcoal,
+              color: AppColors.surface,
               fontSize: 20,
               fontFamily: 'Inter',
               fontWeight: FontWeight.w500,

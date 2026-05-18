@@ -42,8 +42,7 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
   int _hitungDurasi(String mulai, String selesai) {
     final mulaiParts = mulai.split(':');
     final selesaiParts = selesai.split(':');
-    final mulaiMenit =
-        int.parse(mulaiParts[0]) * 60 + int.parse(mulaiParts[1]);
+    final mulaiMenit = int.parse(mulaiParts[0]) * 60 + int.parse(mulaiParts[1]);
     final selesaiMenit =
         int.parse(selesaiParts[0]) * 60 + int.parse(selesaiParts[1]);
     return selesaiMenit - mulaiMenit;
@@ -88,15 +87,18 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
   @override
   Widget build(BuildContext context) {
     final j = widget.jadwalTerpilih;
-    final jamSelesaiOtomatis =
-        _jamMulai != null ? _hitungJamSelesai(_jamMulai!) : null;
+    final jamSelesaiOtomatis = _jamMulai != null
+        ? _hitungJamSelesai(_jamMulai!)
+        : null;
 
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Ajukan Pergantian Jadwal',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.primary,
+        title: const Text(
+          'Ajukan Pergantian Jadwal',
+          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        backgroundColor: AppColors.primaryBlue,
         iconTheme: const IconThemeData(color: Colors.white),
         elevation: 0,
       ),
@@ -112,23 +114,30 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
               decoration: BoxDecoration(
                 color: AppColors.primary.withValues(alpha: 0.07),
                 borderRadius: BorderRadius.circular(14),
-                border: Border.all(color: AppColors.primary.withValues(alpha: 0.2)),
+                border: Border.all(
+                  color: AppColors.primary.withValues(alpha: 0.2),
+                ),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  const Text('Jadwal Asli',
-                      style: TextStyle(
-                          color: AppColors.primary,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 13)),
+                  const Text(
+                    'Jadwal Asli',
+                    style: TextStyle(
+                      color: AppColors.primary,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                    ),
+                  ),
                   const SizedBox(height: 10),
                   _infoRow(Icons.book_outlined, j['namaMK'] ?? '-'),
                   const SizedBox(height: 6),
                   _infoRow(Icons.people_outline, 'Kelas ${j['kelas'] ?? '-'}'),
                   const SizedBox(height: 6),
-                  _infoRow(Icons.schedule_outlined,
-                      '${j['hari'] ?? '-'}  •  $_jamMulaiAsli - $_jamSelesaiAsli ($_durasiMenit menit)'),
+                  _infoRow(
+                    Icons.schedule_outlined,
+                    '${j['hari'] ?? '-'}  •  $_jamMulaiAsli - $_jamSelesaiAsli ($_durasiMenit menit)',
+                  ),
                   const SizedBox(height: 6),
                   _infoRow(Icons.room_outlined, j['ruangan'] ?? '-'),
                 ],
@@ -136,11 +145,14 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
             ),
             const SizedBox(height: 28),
 
-            const Text('Pilih Jadwal Pengganti',
-                style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 16,
-                    color: AppColors.textPrimary)),
+            const Text(
+              'Pilih Jadwal Pengganti',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+                color: AppColors.textPrimary,
+              ),
+            ),
             const SizedBox(height: 14),
 
             // Tanggal
@@ -149,7 +161,10 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
               label: 'Tanggal Pengganti',
               value: _selectedDate == null
                   ? 'Pilih tanggal'
-                  : DateFormat('EEEE, dd MMMM yyyy', 'id').format(_selectedDate!),
+                  : DateFormat(
+                      'EEEE, dd MMMM yyyy',
+                      'id',
+                    ).format(_selectedDate!),
               onTap: _pilihTanggal,
               isEmpty: _selectedDate == null,
             ),
@@ -175,15 +190,22 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.access_time_filled,
-                      color: AppColors.textSecondary, size: 20),
+                  const Icon(
+                    Icons.access_time_filled,
+                    color: AppColors.textSecondary,
+                    size: 20,
+                  ),
                   const SizedBox(width: 12),
                   Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      const Text('Jam Selesai (otomatis)',
-                          style: TextStyle(
-                              color: AppColors.textSecondary, fontSize: 12)),
+                      const Text(
+                        'Jam Selesai (otomatis)',
+                        style: TextStyle(
+                          color: AppColors.textSecondary,
+                          fontSize: 12,
+                        ),
+                      ),
                       Text(
                         jamSelesaiOtomatis ?? '--:--  (isi jam mulai dulu)',
                         style: TextStyle(
@@ -198,17 +220,22 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
                   ),
                   const Spacer(),
                   Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
                     decoration: BoxDecoration(
                       color: AppColors.primary.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text('$_durasiMenit menit',
-                        style: const TextStyle(
-                            color: AppColors.primary,
-                            fontSize: 11,
-                            fontWeight: FontWeight.bold)),
+                    child: Text(
+                      '$_durasiMenit menit',
+                      style: const TextStyle(
+                        color: AppColors.primary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -222,7 +249,8 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
                 style: ElevatedButton.styleFrom(
                   backgroundColor: AppColors.primary,
                   shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(14)),
+                    borderRadius: BorderRadius.circular(14),
+                  ),
                 ),
                 onPressed: (_selectedDate == null || _jamMulai == null)
                     ? null
@@ -231,7 +259,10 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
                         final jamSelesaiStr = _hitungJamSelesai(_jamMulai!);
 
                         await widget.vm.cariRuangan(
-                            _selectedDate!, jamMulaiStr, jamSelesaiStr);
+                          _selectedDate!,
+                          jamMulaiStr,
+                          jamSelesaiStr,
+                        );
 
                         if (context.mounted) {
                           Navigator.push(
@@ -251,11 +282,14 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
                       },
                 child: widget.vm.isLoading
                     ? const CircularProgressIndicator(color: Colors.white)
-                    : const Text('Cari Ruangan Kosong',
+                    : const Text(
+                        'Cari Ruangan Kosong',
                         style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white)),
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
               ),
             ),
           ],
@@ -270,9 +304,11 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
         Icon(icon, size: 16, color: AppColors.primary),
         const SizedBox(width: 8),
         Expanded(
-            child: Text(text,
-                style: const TextStyle(
-                    fontSize: 13, color: AppColors.textPrimary))),
+          child: Text(
+            text,
+            style: const TextStyle(fontSize: 13, color: AppColors.textPrimary),
+          ),
+        ),
       ],
     );
   }
@@ -296,28 +332,39 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
         ),
         child: Row(
           children: [
-            Icon(icon,
-                color: isEmpty ? AppColors.textSecondary : AppColors.primary,
-                size: 20),
+            Icon(
+              icon,
+              color: isEmpty ? AppColors.textSecondary : AppColors.primary,
+              size: 20,
+            ),
             const SizedBox(width: 12),
             Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(label,
-                    style: const TextStyle(
-                        color: AppColors.textSecondary, fontSize: 12)),
-                Text(value,
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 15,
-                        color: isEmpty
-                            ? AppColors.textSecondary
-                            : AppColors.textPrimary)),
+                Text(
+                  label,
+                  style: const TextStyle(
+                    color: AppColors.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+                Text(
+                  value,
+                  style: TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 15,
+                    color: isEmpty
+                        ? AppColors.textSecondary
+                        : AppColors.textPrimary,
+                  ),
+                ),
               ],
             ),
             const Spacer(),
-            const Icon(Icons.chevron_right_rounded,
-                color: AppColors.textSecondary),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: AppColors.textSecondary,
+            ),
           ],
         ),
       ),
