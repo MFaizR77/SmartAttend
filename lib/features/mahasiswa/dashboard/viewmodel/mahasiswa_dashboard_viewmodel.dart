@@ -26,7 +26,7 @@ class MahasiswaDashboardViewModel {
     if (user.kelas == null || user.kelas!.isEmpty) return;
 
     try {
-      final jadwalDB = await DatabaseService().getJadwalMahasiswa(user.kelas!, program: user.program);
+      final jadwalDB = await DatabaseService().getJadwalMahasiswa(user.id);
       
       final mappedJadwal = jadwalDB.map((doc) {
         return {

@@ -1,3 +1,6 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
@@ -27,10 +30,21 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
   final Map<String, bool> _isSubmitting = {};
   final Map<String, bool> _isKelasBuka = {};
 
+  /// Polling status `isKelasBerjalan` setiap 15 detik supaya mahasiswa tidak
+  /// perlu pull-to-refresh manual setelah dosen membuka sesi.
+  Timer? _statusPoller;
+  static const Duration _pollInterval = Duration(seconds: 15);
+
   @override
   void initState() {
     super.initState();
     _loadAll();
+  }
+
+  @override
+  void dispose() {
+    _statusPoller?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadAll() async {
@@ -40,15 +54,16 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
       _error = null;
     });
     try {
+      // 1. Ambil jadwal reguler — sekarang berbasis enrollments mahasiswa
+      //    (bukan lagi kelas+program), source of truth ada di koleksi enrollments.
+      final reguler = await DatabaseService().getJadwalMahasiswa(widget.user.id);
+
+      // 2. Ambil jadwal pengganti yang sudah disetujui (tetap berbasis kelas
+      //    karena pengganti di-approve admin per kelas, bukan per enrollment).
       final kelas = widget.user.kelas ?? '';
-      if (kelas.isEmpty) throw Exception('Data kelas tidak ditemukan.');
-
-      // 1. Ambil jadwal reguler
-      final reguler = await DatabaseService().getJadwalMahasiswa(kelas);
-
-      // 2. Ambil jadwal pengganti yang sudah disetujui
-      final pengganti =
-          await DatabaseService().getJadwalPenggantiMahasiswa(kelas);
+      final pengganti = kelas.isEmpty
+          ? const <Map<String, dynamic>>[]
+          : await DatabaseService().getJadwalPenggantiMahasiswa(kelas);
 
       // 3. Gabungkan dan petakan (map) agar formatnya seragam
       final List<Map<String, dynamic>> gabungan = [];
@@ -83,13 +98,12 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
         _isLoading = false;
       });
 
-      // Check status presensi & kelas untuk setiap jadwal secara paralel
-      for (final j in gabungan) {
-        final id = j['_id']?.toString() ?? '';
-        if (id.isEmpty) continue;
-        _checkStatus(id);
-      }
+      // Check status presensi & kelas untuk setiap jadwal sekali saat awal,
+      // lalu hidupkan poller untuk update otomatis.
+      await _refreshAllStatus();
+      _startStatusPolling();
     } catch (e) {
+      debugPrint('[AbsensiList] _loadAll error: $e');
       if (!mounted) return;
       setState(() {
         _error = e.toString();
@@ -98,10 +112,38 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
     }
   }
 
+  /// Re-check status semua jadwal yang ada di list.
+  Future<void> _refreshAllStatus() async {
+    final ids = _jadwalHariIni
+        .map((j) => j['_id']?.toString() ?? '')
+        .where((id) => id.isNotEmpty)
+        .toList();
+    if (ids.isEmpty) return;
+
+    // Hanya poll yang belum hadir & belum selesai jam pelajarannya — sisanya
+    // sudah final (hadir/selesai), tidak ada gunanya nge-hit DB lagi.
+    for (final j in _jadwalHariIni) {
+      final id = j['_id']?.toString() ?? '';
+      if (id.isEmpty) continue;
+      if (_isHadir[id] == true) continue;
+      if (_isSelesai(j)) continue;
+      await _checkStatus(id);
+    }
+  }
+
+  void _startStatusPolling() {
+    _statusPoller?.cancel();
+    _statusPoller = Timer.periodic(_pollInterval, (_) async {
+      if (!mounted) return;
+      await _refreshAllStatus();
+    });
+  }
+
   Future<void> _checkStatus(String jadwalId) async {
     try {
       // Cek kelas buka dari laporan_dosen
       final buka = await DatabaseService().isKelasBerjalan(jadwalId);
+      debugPrint('[AbsensiList] isKelasBerjalan($jadwalId) = $buka');
       if (!mounted) return;
       setState(() => _isKelasBuka[jadwalId] = buka);
 
@@ -132,7 +174,10 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
         if (!mounted) return;
         setState(() => _isHadir[jadwalId] = exists);
       }
-    } catch (_) {}
+    } catch (e, st) {
+      debugPrint('[AbsensiList] _checkStatus($jadwalId) error: $e');
+      debugPrint('$st');
+    }
   }
 
   Future<void> _doCheckIn(String jadwalId) async {

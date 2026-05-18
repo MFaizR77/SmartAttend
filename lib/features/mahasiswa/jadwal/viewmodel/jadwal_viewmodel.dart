@@ -32,7 +32,7 @@ class JadwalViewModel {
 
     try {
       final allJadwal =
-          await DatabaseService().getSemuaJadwalMahasiswa(user.kelas!, program: user.program);
+          await DatabaseService().getSemuaJadwalMahasiswa(user.id);
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final j in allJadwal) {

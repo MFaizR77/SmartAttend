@@ -254,6 +254,18 @@ class DatabaseService {
     });
   }
 
+  /// Internal: ambil periode aktif TANPA antri di `_opQueue`.
+  /// HANYA boleh dipanggil dari dalam callback `_withReconnect` lain — kalau
+  /// dipanggil di luar, koneksi belum tentu siap. Tujuannya: hindari deadlock
+  /// nested mutex (outer _withReconnect menunggu inner yang antri di belakangnya).
+  Future<Map<String, dynamic>?> _getActivePeriodeRaw() async {
+    if (_activePeriodeCache != null) return _activePeriodeCache;
+    _activePeriodeCache = await _requireDb
+        .collection('periode_akademik')
+        .findOne(where.eq('aktif', true));
+    return _activePeriodeCache;
+  }
+
   Future<List<Map<String, dynamic>>> getAllPeriode() async {
     await connect();
     final list = await _requireDb.collection('periode_akademik').find().toList();
@@ -321,35 +333,67 @@ class DatabaseService {
   }
 
   // ─────────────────────────────────────────────────────
-  // JADWAL — MAHASISWA (filter periode aktif + program)
+  // JADWAL — MAHASISWA (via enrollments × periode aktif)
   // ─────────────────────────────────────────────────────
+  //
+  // SUMBER KEBENARAN: koleksi `enrollments`. Dokumen jadwal_kuliah hanya
+  // di-resolve setelah daftar jadwalId mahasiswa tertentu didapat dari
+  // enrollments-nya (status='aktif' di periode aktif).
+  //
+  // Manfaat:
+  // - Tidak campur antar program (D3 vs D4) walau kelas namanya sama.
+  // - Mahasiswa drop/pindah matkul otomatis hilang dari list.
+  // - Konsisten dengan PD-Dikti (1 mhs ↔ N enrollment).
 
-  Future<List<Map<String, dynamic>>> getJadwalMahasiswa(String kelas, {String? program}) async {
+  /// Internal: ambil semua jadwalId aktif mahasiswa di periode aktif.
+  /// HARUS dipanggil dari dalam callback `_withReconnect` (tidak antri di queue
+  /// sendiri, supaya outer caller tidak deadlock).
+  Future<List<String>> _enrolledJadwalIds(String mahasiswaId) async {
+    final periode = await _getActivePeriodeRaw();
+    final periodeKode = periode?['kode'] as String?;
+    final selector = <String, dynamic>{
+      'mahasiswaId': mahasiswaId,
+      'status': 'aktif',
+    };
+    if (periodeKode != null) {
+      selector['periodeAkademikKode'] = periodeKode;
+    }
+    final enrolls = await _requireDb.collection('enrollments').find(selector).toList();
+    return enrolls
+        .map((e) => e['jadwalId']?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toList();
+  }
+
+  /// Jadwal mahasiswa untuk HARI INI.
+  /// `mahasiswaId` = NIM (sesuai `_id` di koleksi `mahasiswa`).
+  Future<List<Map<String, dynamic>>> getJadwalMahasiswa(String mahasiswaId) async {
     return _withReconnect(() async {
+      final jadwalIds = await _enrolledJadwalIds(mahasiswaId);
+      if (jadwalIds.isEmpty) return const <Map<String, dynamic>>[];
+
       final hari = getHariIni();
-      final selector = <String, dynamic>{
-        'kelas': kelas,
+      final list = await _requireDb.collection('jadwal_kuliah').find({
+        '_id': {r'$in': jadwalIds},
         'hari': hari,
         'isActive': true,
-      };
-      if (program != null) selector['program'] = program;
-
-      final list = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
+      }).toList();
       list.sort((a, b) =>
           (a['jamMulai'] as String? ?? '').compareTo(b['jamMulai'] as String? ?? ''));
       return list;
     });
   }
 
-  Future<List<Map<String, dynamic>>> getSemuaJadwalMahasiswa(String kelas, {String? program}) async {
+  /// Semua jadwal mahasiswa di periode aktif (semua hari).
+  Future<List<Map<String, dynamic>>> getSemuaJadwalMahasiswa(String mahasiswaId) async {
     return _withReconnect(() async {
-      final selector = <String, dynamic>{
-        'kelas': kelas,
-        'isActive': true,
-      };
-      if (program != null) selector['program'] = program;
+      final jadwalIds = await _enrolledJadwalIds(mahasiswaId);
+      if (jadwalIds.isEmpty) return const <Map<String, dynamic>>[];
 
-      final list = await _requireDb.collection('jadwal_kuliah').find(selector).toList();
+      final list = await _requireDb.collection('jadwal_kuliah').find({
+        '_id': {r'$in': jadwalIds},
+        'isActive': true,
+      }).toList();
       const urut = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
       list.sort((a, b) {
         final iA = urut.indexOf(a['hari'] as String? ?? '');
@@ -547,6 +591,7 @@ class DatabaseService {
       'jadwalId': jadwalId,
       'tanggal': {r'$gte': start, r'$lte': end},
     });
+    String matchedVia = r != null ? 'tanggal-DateTime' : 'none';
     if (r == null) {
       r = await coll.findOne({
         'jadwalId': jadwalId,
@@ -555,6 +600,7 @@ class DatabaseService {
           r'$lte': end.toIso8601String(),
         },
       });
+      if (r != null) matchedVia = 'tanggal-String';
     }
     if (r == null) {
       final all = await coll.find({'jadwalId': jadwalId}).toList();
@@ -565,12 +611,19 @@ class DatabaseService {
         else if (v is String) t = DateTime.tryParse(v);
         if (t != null && t.year == now.year && t.month == now.month && t.day == now.day) {
           r = rec;
+          matchedVia = 'tanggal-fallback';
           break;
         }
       }
     }
-    if (r == null) return false;
-    return r['waktuMulai'] != null && r['waktuSelesai'] == null;
+    if (r == null) {
+      print('[isKelasBerjalan] $jadwalId → null (matchedVia=$matchedVia)');
+      return false;
+    }
+    final result = r['waktuMulai'] != null && r['waktuSelesai'] == null;
+    print('[isKelasBerjalan] $jadwalId → $result '
+        '(matchedVia=$matchedVia, waktuMulai=${r['waktuMulai']}, waktuSelesai=${r['waktuSelesai']})');
+    return result;
   }
 
   Future<void> insertOrUpdateLaporanDosen(Map<String, dynamic> record) async {

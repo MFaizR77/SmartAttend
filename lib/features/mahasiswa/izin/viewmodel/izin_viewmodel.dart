@@ -20,8 +20,7 @@ class IzinViewModel {
     isLoading.value = true;
     errorMessage.value = null;
     try {
-      final all = await DatabaseService()
-          .getSemuaJadwalMahasiswa(user.kelas!, program: user.program);
+      final all = await DatabaseService().getSemuaJadwalMahasiswa(user.id);
       final hari = DatabaseService().getHariFromDate(tanggal);
       jadwalTerdampakPreview.value =
           all.where((j) => j['hari']?.toString() == hari).toList();
