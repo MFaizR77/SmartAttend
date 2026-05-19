@@ -6,6 +6,8 @@ import '../../pergantian_jadwal/view/pergantian_jadwal_screen.dart';
 import '../../../profil/view/profil_screen.dart';
 import '../../rekap/view/rekap_dosen_screen.dart'; // We will create this
 import '../../approval/view/approval_screen.dart';
+import '../../tindak_lanjut_izin/view/tindak_lanjut_screen.dart';
+import '../../izin/view/pengajuan_izin_sakit_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
   final User user;
@@ -782,6 +784,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
     final menus = [
       {'icon': Icons.play_circle_outline, 'label': 'Sesi'},
       {'icon': Icons.edit_calendar, 'label': 'Ganti Jadwal'},
+      {'icon': Icons.event_note, 'label': 'Izin/Sakit'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
 
@@ -797,6 +800,13 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                     context,
                     MaterialPageRoute(
                       builder: (_) => PergantianJadwalScreen(user: widget.user),
+                    ),
+                  );
+                } else if (menu['label'] == 'Izin/Sakit') {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => PengajuanIzinSakitScreen(user: widget.user),
                     ),
                   );
                 } else if (menu['label'] == 'Rekap') {

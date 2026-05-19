@@ -8,6 +8,7 @@ import '../../presensi/view/absensi_list_screen.dart';
 import '../../jadwal/view/jadwal_screen.dart';
 import '../../rekap/view/rekap_screen.dart';
 import '../../../profil/view/profil_screen.dart';
+import '../../izin/view/izin_screen.dart';
 import 'dart:async';
 import '../../../../data/remote/database_service.dart';
 import '../../../../core/services/notification_service.dart';
@@ -571,6 +572,13 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                             child: RekapScreen(user: widget.user),
                           ),
                         ),
+                      ),
+                    );
+                  } else if (menu['label'] == 'Izin/Sakit') {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => IzinScreen(user: widget.user),
                       ),
                     );
                   } else {

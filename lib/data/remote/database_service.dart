@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:bcrypt/bcrypt.dart';
 
 /// Singleton service untuk operasi MongoDB.
 ///
@@ -185,42 +186,82 @@ class DatabaseService {
 
   /// Login ke koleksi `mahasiswa` dengan NIM/email + password.
   Future<Map<String, dynamic>?> loginMahasiswa(String identifier, String password) async {
-    return _withReconnect(() => _requireDb.collection('mahasiswa').findOne({
-      r'$and': [
-        {r'$or': [{'_id': identifier}, {'nim': identifier}, {'email': identifier}]},
-        {r'$or': [{'passwordPlain': password}, {'passwordHash': password}]},
-      ],
-    }));
+    return _withReconnect(() async {
+      final coll = _requireDb.collection('mahasiswa');
+      final doc = await coll.findOne({
+        r'$or': [{'_id': identifier}, {'nim': identifier}, {'email': identifier}],
+      });
+      if (doc == null) return null;
+      final pwdPlain = doc['passwordPlain']?.toString();
+      final pwdHash = doc['passwordHash']?.toString();
+      if (pwdPlain != null && pwdPlain == password) return doc;
+      if (pwdHash != null && pwdHash.isNotEmpty) {
+        try {
+          if (BCrypt.checkpw(password, pwdHash)) return doc;
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   /// Login ke koleksi `dosen` dengan kode/email + password.
   Future<Map<String, dynamic>?> loginDosen(String identifier, String password) async {
-    return _withReconnect(() => _requireDb.collection('dosen').findOne({
-      r'$and': [
-        {r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}]},
-        {r'$or': [{'passwordPlain': password}, {'passwordHash': password}]},
-      ],
-    }));
+    return _withReconnect(() async {
+      final coll = _requireDb.collection('dosen');
+      final doc = await coll.findOne({
+        r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}],
+      });
+      if (doc == null) return null;
+      final pwdPlain = doc['passwordPlain']?.toString();
+      final pwdHash = doc['passwordHash']?.toString();
+      if (pwdPlain != null && pwdPlain == password) return doc;
+      if (pwdHash != null && pwdHash.isNotEmpty) {
+        try {
+          if (BCrypt.checkpw(password, pwdHash)) return doc;
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   /// Login ke koleksi `wali_dosen` dengan kode (mis. WD_KO071N_2B_D3) + password.
   Future<Map<String, dynamic>?> loginWaliDosen(String identifier, String password) async {
-    return _withReconnect(() => _requireDb.collection('wali_dosen').findOne({
-      r'$and': [
-        {r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}]},
-        {r'$or': [{'passwordPlain': password}, {'passwordHash': password}]},
-      ],
-    }));
+    return _withReconnect(() async {
+      final coll = _requireDb.collection('wali_dosen');
+      final doc = await coll.findOne({
+        r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}],
+      });
+      if (doc == null) return null;
+      final pwdPlain = doc['passwordPlain']?.toString();
+      final pwdHash = doc['passwordHash']?.toString();
+      if (pwdPlain != null && pwdPlain == password) return doc;
+      if (pwdHash != null && pwdHash.isNotEmpty) {
+        try {
+          if (BCrypt.checkpw(password, pwdHash)) return doc;
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   /// Login ke koleksi `admin` dengan kode/email + password.
   Future<Map<String, dynamic>?> loginAdmin(String identifier, String password) async {
-    return _withReconnect(() => _requireDb.collection('admin').findOne({
-      r'$and': [
-        {r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}]},
-        {r'$or': [{'passwordPlain': password}, {'passwordHash': password}]},
-      ],
-    }));
+    return _withReconnect(() async {
+      final coll = _requireDb.collection('admin');
+      final doc = await coll.findOne({
+        r'$or': [{'_id': identifier}, {'kode': identifier}, {'email': identifier}],
+      });
+      if (doc == null) return null;
+      final pwdPlain = doc['passwordPlain']?.toString();
+      final pwdHash = doc['passwordHash']?.toString();
+      if (pwdPlain != null && pwdPlain == password) return doc;
+      if (pwdHash != null && pwdHash.isNotEmpty) {
+        try {
+          if (BCrypt.checkpw(password, pwdHash)) return doc;
+        } catch (_) {}
+      }
+      return null;
+    });
   }
 
   /// Backward-compat untuk kode lama yang masih panggil `login(identifier, password)`.
