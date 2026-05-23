@@ -1325,6 +1325,7 @@ class DatabaseService {
         errors.add('Baris $ln: program "$program" — harus D3 atau D4');
       }
       final hari = r['hari'].toString().trim();
+      if (!validHari.contains(hari)) {
         errors.add('Baris $ln: hari "$hari" tidak valid (Senin-Minggu)');
       }
 
