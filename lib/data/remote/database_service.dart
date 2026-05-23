@@ -1255,50 +1255,135 @@ class DatabaseService {
   }
 
   // ─────────────────────────────────────────────────────
-  // ADMIN: UPLOAD JADWAL CSV
+  // ADMIN: UPLOAD JADWAL (Excel/CSV)
   // ─────────────────────────────────────────────────────
 
   /// Validasi rows. Return list error per baris (kosong = aman).
+  ///
+  /// Aturan:
+  /// - Field wajib non-kosong (mandatory).
+  /// - Master data harus ada (`dosen`, `ruangan`).
+  /// - Enum: `tipe ∈ {TE, PR}`, `program ∈ {D3, D4}`,
+  ///   `hari ∈ {Senin..Minggu}`.
+  /// - Format jam HH:MM atau HH.MM, dan jamMulai < jamSelesai.
+  /// - Deteksi baris duplikat (composite ID sama persis).
   Future<List<String>> validateJadwalRows(List<Map<String, dynamic>> rows) async {
     await connect();
     final errors = <String>[];
     final dosenSet = (await _requireDb.collection('dosen').find().toList())
         .map((d) => d['_id'].toString())
         .toSet();
-    final mkSet = (await _requireDb.collection('mata_kuliah').find().toList())
-        .map((m) => m['_id'].toString())
-        .toSet();
     final ruanganSet = (await _requireDb.collection('ruangan').find().toList())
         .map((r) => r['_id'].toString())
         .toSet();
 
+    const validTipe = {'TE', 'PR'};
+    const validProgram = {'D3', 'D4'};
+    const validHari = {
+      'Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu',
+    };
+
+    // Untuk deteksi duplikat: composite ID + dosenKode (karena 1 jadwal bisa
+    // diajar banyak dosen — itu BUKAN duplikat, tapi team teaching).
+    final seen = <String, int>{}; // compositeId|dosen → first row
+
     for (var i = 0; i < rows.length; i++) {
       final r = rows[i];
-      final ln = i + 2; // baris CSV (header = 1)
-      for (final f in ['kodeMK', 'namaMK', 'kelas', 'kodeDosen', 'hari', 'jamMulai', 'jamSelesai', 'kodeRuangan', 'tipe', 'program']) {
-        if ((r[f]?.toString() ?? '').isEmpty) {
+      final ln = i + 2; // baris di file (header = 1)
+
+      // 1. Mandatory fields
+      const mandatory = [
+        'kodeMK', 'namaMK', 'kelas', 'kodeDosen', 'hari',
+        'jamMulai', 'jamSelesai', 'kodeRuangan', 'tipe', 'program',
+      ];
+      bool hasEmpty = false;
+      for (final f in mandatory) {
+        if ((r[f]?.toString().trim() ?? '').isEmpty) {
           errors.add('Baris $ln: field "$f" kosong');
+          hasEmpty = true;
         }
       }
-      if (!dosenSet.contains(r['kodeDosen']?.toString())) {
-        errors.add('Baris $ln: kodeDosen "${r['kodeDosen']}" tidak ada di koleksi dosen');
+      if (hasEmpty) continue; // skip cek lanjut kalau ada yg kosong
+
+      // 2. Master data
+      final kodeDosen = r['kodeDosen'].toString().trim();
+      if (!dosenSet.contains(kodeDosen)) {
+        errors.add('Baris $ln: kodeDosen "$kodeDosen" tidak ada di koleksi dosen');
       }
-      if (!ruanganSet.contains(r['kodeRuangan']?.toString())) {
-        errors.add('Baris $ln: kodeRuangan "${r['kodeRuangan']}" tidak ada di koleksi ruangan');
+      final kodeRuangan = r['kodeRuangan'].toString().trim();
+      if (!ruanganSet.contains(kodeRuangan)) {
+        errors.add('Baris $ln: kodeRuangan "$kodeRuangan" tidak ada di koleksi ruangan');
       }
-      if (mkSet.contains(r['kodeMK']?.toString())) {
-        // OK existing — aman
+
+      // 3. Enum
+      final tipe = r['tipe'].toString().trim();
+      if (!validTipe.contains(tipe)) {
+        errors.add('Baris $ln: tipe "$tipe" — harus TE atau PR');
       }
-      // tipe valid?
-      if (!['TE', 'PR'].contains(r['tipe']?.toString())) {
-        errors.add('Baris $ln: tipe harus TE atau PR');
+      final program = r['program'].toString().trim();
+      if (!validProgram.contains(program)) {
+        errors.add('Baris $ln: program "$program" — harus D3 atau D4');
+      }
+      final hari = r['hari'].toString().trim();
+        errors.add('Baris $ln: hari "$hari" tidak valid (Senin-Minggu)');
+      }
+
+      // 4. Jam: format & range
+      final jamMulai = _normalizeJam(r['jamMulai'].toString().trim());
+      final jamSelesai = _normalizeJam(r['jamSelesai'].toString().trim());
+      if (jamMulai == null) {
+        errors.add('Baris $ln: jamMulai "${r['jamMulai']}" tidak valid (HH:MM)');
+      }
+      if (jamSelesai == null) {
+        errors.add('Baris $ln: jamSelesai "${r['jamSelesai']}" tidak valid (HH:MM)');
+      }
+      if (jamMulai != null && jamSelesai != null) {
+        if (jamMulai.compareTo(jamSelesai) >= 0) {
+          errors.add('Baris $ln: jamMulai harus lebih awal dari jamSelesai');
+        }
+      }
+
+      // 5. Duplikat (composite + dosen)
+      if (jamMulai != null && validTipe.contains(tipe) && validProgram.contains(program)) {
+        final jamId = jamMulai.replaceAll(':', '');
+        final compositeKey = '${program}_${r['kelas']}_${r['kodeMK']}_${hari}_${jamId}_${tipe}_$kodeDosen';
+        if (seen.containsKey(compositeKey)) {
+          errors.add(
+            'Baris $ln: duplikat dengan baris ${seen[compositeKey]} '
+            '(jadwal+dosen sama persis)',
+          );
+        } else {
+          seen[compositeKey] = ln;
+        }
       }
     }
     return errors;
   }
 
+  /// Normalisasi format jam ke "HH:MM". Terima "HH.MM" atau "HH:MM".
+  /// Return null kalau tidak valid.
+  String? _normalizeJam(String raw) {
+    final s = raw.replaceAll('.', ':').trim();
+    final m = RegExp(r'^(\d{1,2}):(\d{2})$').firstMatch(s);
+    if (m == null) return null;
+    final h = int.tryParse(m.group(1)!);
+    final mn = int.tryParse(m.group(2)!);
+    if (h == null || mn == null) return null;
+    if (h < 0 || h > 23 || mn < 0 || mn > 59) return null;
+    return '${h.toString().padLeft(2, '0')}:${mn.toString().padLeft(2, '0')}';
+  }
+
   /// Commit upload jadwal. `rows` sudah divalidasi.
-  /// Kalau `program` di row belum ada di mata_kuliah, akan auto-create matkul baru.
+  ///
+  /// **Team teaching support**: Kalau beberapa baris punya composite ID identik
+  /// (program+kelas+kodeMK+hari+jamMulai+tipe) tapi `kodeDosen` berbeda, mereka
+  /// dianggap **satu jadwal team teaching**. Output dokumen punya:
+  ///   - `dosenIds: [KO067N, KO003N, KO006N]`   (array, sumber kebenaran)
+  ///   - `dosenId: KO067N`                       (primary, untuk back-compat)
+  ///   - `kodeDosen: KO067N`                     (back-compat)
+  ///   - `namaDosenList: ['Asri Maspupah', ...]` (array)
+  ///   - `namaDosen: 'Asri Maspupah; Bambang Wisnuadhi; Irawan Thamrin'`
+  ///     (string gabungan, untuk tampilan singkat)
   Future<Map<String, dynamic>> commitJadwalRows({
     required String adminId,
     required String periodeKode,
@@ -1317,25 +1402,44 @@ class DatabaseService {
     final mkColl = _requireDb.collection('mata_kuliah');
     final jadwalColl = _requireDb.collection('jadwal_kuliah');
 
+    // ── 1. Group rows by composite jadwalId ──────────────────────────
+    // Beberapa baris dengan jadwalId sama → team teaching.
+    final groups = <String, List<Map<String, dynamic>>>{};
+    for (final r in rows) {
+      final program = r['program'].toString().trim();
+      final kelas = r['kelas'].toString().trim();
+      final kodeMK = r['kodeMK'].toString().trim();
+      final hari = r['hari'].toString().trim();
+      final jamMulai = _normalizeJam(r['jamMulai'].toString()) ?? r['jamMulai'].toString();
+      final tipe = r['tipe'].toString().trim();
+      final jamId = jamMulai.replaceAll(':', '');
+      final jadwalId = '${program}_${kelas}_${kodeMK}_${hari}_${jamId}_$tipe';
+      groups.putIfAbsent(jadwalId, () => []).add({...r, '_normalizedJamMulai': jamMulai});
+    }
+
     int matkulCreated = 0;
     int jadwalCreated = 0;
     int jadwalUpdated = 0;
+    int teamTeachingCount = 0;
 
-    for (final r in rows) {
-      final kodeMK = r['kodeMK'].toString();
-      final program = r['program'].toString();
-      final kelas = r['kelas'].toString();
-      final hari = r['hari'].toString();
-      final jamMulai = r['jamMulai'].toString();
-      final jamSelesai = r['jamSelesai'].toString();
-      final tipe = r['tipe'].toString();
-      final kodeDosen = r['kodeDosen'].toString();
-      final kodeRuangan = r['kodeRuangan'].toString();
-      final namaMK = r['namaMK'].toString();
-      final sks = int.tryParse(r['sks']?.toString() ?? '0') ?? 0;
-      final semester = int.tryParse(r['semester']?.toString() ?? '0') ?? 0;
+    for (final entry in groups.entries) {
+      final jadwalId = entry.key;
+      final groupRows = entry.value;
+      final first = groupRows.first;
 
-      // Upsert matkul kalau belum ada
+      final kodeMK = first['kodeMK'].toString().trim();
+      final program = first['program'].toString().trim();
+      final kelas = first['kelas'].toString().trim();
+      final hari = first['hari'].toString().trim();
+      final jamMulai = first['_normalizedJamMulai'].toString();
+      final jamSelesai = _normalizeJam(first['jamSelesai'].toString()) ?? first['jamSelesai'].toString();
+      final tipe = first['tipe'].toString().trim();
+      final kodeRuangan = first['kodeRuangan'].toString().trim();
+      final namaMK = first['namaMK'].toString().trim();
+      final sks = int.tryParse(first['sks']?.toString() ?? '0') ?? 0;
+      final semester = int.tryParse(first['semester']?.toString() ?? '0') ?? 0;
+
+      // ── 2. Upsert mata kuliah ──
       final existingMK = await mkColl.findOne(where.eq('_id', kodeMK));
       if (existingMK == null) {
         await mkColl.insertOne({
@@ -1352,11 +1456,22 @@ class DatabaseService {
         matkulCreated++;
       }
 
-      final jamId = jamMulai.replaceAll(':', '');
-      final jadwalId = '${program}_${kelas}_${kodeMK}_${hari}_${jamId}_$tipe';
+      // ── 3. Build dosenIds (preserve order) ──
+      final dosenIds = <String>[];
+      final namaDosenList = <String>[];
+      final seenDosen = <String>{};
+      for (final r in groupRows) {
+        final kd = r['kodeDosen'].toString().trim();
+        if (seenDosen.add(kd)) {
+          dosenIds.add(kd);
+          namaDosenList.add(dosenName[kd] ?? kd);
+        }
+      }
+      if (dosenIds.length > 1) teamTeachingCount++;
 
+      // ── 4. Upsert jadwal_kuliah ──
       final existingJadwal = await jadwalColl.findOne(where.eq('_id', jadwalId));
-      final doc = {
+      final doc = <String, dynamic>{
         '_id': jadwalId,
         'jadwalId': jadwalId,
         'periodeAkademikKode': periodeKode,
@@ -1368,13 +1483,18 @@ class DatabaseService {
         'semester': semester,
         'kelas': kelas,
         'program': program,
-        'dosenId': kodeDosen,
-        'kodeDosen': kodeDosen,
-        'namaDosen': dosenName[kodeDosen] ?? kodeDosen,
+        // Dosen — primary single (back-compat) + array (sumber kebenaran)
+        'dosenId': dosenIds.first,
+        'kodeDosen': dosenIds.first,
+        'dosenIds': dosenIds,
+        'namaDosen': namaDosenList.join('; '),
+        'namaDosenList': namaDosenList,
+        // Ruangan
         'ruanganId': kodeRuangan,
         'ruanganKode': kodeRuangan,
         'ruanganNama': ruanganName[kodeRuangan] ?? kodeRuangan,
         'ruangan': ruanganName[kodeRuangan] ?? kodeRuangan,
+        // Slot
         'hari': hari,
         'jamMulai': jamMulai,
         'jamSelesai': jamSelesai,
@@ -1391,13 +1511,15 @@ class DatabaseService {
       }
     }
 
-    // Audit log
+    // ── 5. Audit log ──
     final auditId = ObjectId();
     final summary = {
       'totalRows': rows.length,
+      'totalGroups': groups.length,
       'jadwalCreated': jadwalCreated,
       'jadwalUpdated': jadwalUpdated,
       'matkulCreated': matkulCreated,
+      'teamTeachingCount': teamTeachingCount,
     };
     await _requireDb.collection('upload_jadwal').insertOne({
       '_id': auditId,
