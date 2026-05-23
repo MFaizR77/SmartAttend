@@ -365,6 +365,12 @@ class DatabaseService {
         .toList();
   }
 
+  /// Public: ambil enrollments aktif mahasiswa di periode aktif.
+  /// Dipakai oleh JadwalCacheService untuk caching offline.
+  Future<List<String>> getEnrolledJadwalIds(String mahasiswaId) async {
+    return _withReconnect(() => _enrolledJadwalIds(mahasiswaId));
+  }
+
   /// Jadwal mahasiswa untuk HARI INI.
   /// `mahasiswaId` = NIM (sesuai `_id` di koleksi `mahasiswa`).
   Future<List<Map<String, dynamic>>> getJadwalMahasiswa(String mahasiswaId) async {
@@ -965,6 +971,17 @@ class DatabaseService {
       data['createdAt'] ??= DateTime.now();
       data['updatedAt'] = DateTime.now();
       await _requireDb.collection('izin_mahasiswa').insertOne(data);
+    });
+  }
+
+  /// Cek apakah dokumen izin dengan `clientUuid` ini sudah ada di server.
+  /// Dipakai SyncManager sebagai dedup guard sebelum re-insert.
+  Future<bool> izinExistsByClientUuid(String clientUuid) async {
+    return _withReconnect(() async {
+      final r = await _requireDb
+          .collection('izin_mahasiswa')
+          .findOne(where.eq('clientUuid', clientUuid));
+      return r != null;
     });
   }
 

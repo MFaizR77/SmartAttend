@@ -5,6 +5,8 @@ import '../../../../data/remote/database_service.dart';
 import '../../../../data/local/hive_helper.dart';
 import '../../../../data/local/models/laporan_dosen.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/session_state_service.dart';
+import '../../../../core/services/sync_manager.dart';
 
 class SesiDosenViewModel {
   final String jadwalId;
@@ -82,6 +84,10 @@ class SesiDosenViewModel {
     );
 
     await _saveData(laporan);
+    // Update cache lokal sesi supaya UI mahasiswa di device ini tahu (penting
+    // untuk skenario satu device dipakai bergantian, dan untuk konsistensi
+    // dengan SessionStateService).
+    await SessionStateService().markOpenedLocally(jadwalId);
     isLoading.value = false;
 
     // Langsung load daftar mahasiswa & mulai auto-refresh
@@ -109,6 +115,7 @@ class SesiDosenViewModel {
         );
 
     await _saveData(laporan);
+    await SessionStateService().markClosedLocally(jadwalId);
     await NotificationService().scheduleDailyReminder();
     isLoading.value = false;
   }
@@ -176,7 +183,10 @@ class SesiDosenViewModel {
       await box.put(syncedLaporan.id, syncedLaporan);
       _currentLaporan = syncedLaporan;
     } catch (e) {
-      print('Gagal simpan online, tersimpan lokal: $e');
+      debugPrint('Gagal simpan online, tersimpan lokal: $e');
+      // Trigger sync queue — akan retry saat online.
+      // ignore: discarded_futures
+      SyncManager().syncAll();
     }
   }
 
