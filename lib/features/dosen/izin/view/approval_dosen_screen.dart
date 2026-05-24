@@ -25,19 +25,15 @@ class _ApprovalDosenScreenState extends State<ApprovalDosenScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F5F5),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildHeader(context),
-            const SizedBox(height: 12),
-            Expanded(child: _buildList(context)),
-          ],
-        ),
-      ),
-      bottomNavigationBar: _buildBottomNav(),
+    // Return only the content portion so this widget can be embedded
+    // inside the Dosen dashboard which already provides the scaffold
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        _buildHeader(context),
+        const SizedBox(height: 12),
+        Expanded(child: _buildList(context)),
+      ],
     );
   }
 
@@ -245,18 +241,5 @@ class _ApprovalDosenScreenState extends State<ApprovalDosenScreen> {
     ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Permintaan ditolak')));
   }
 
-  Widget _buildBottomNav() {
-    return BottomNavigationBar(
-      currentIndex: 2,
-      showUnselectedLabels: true,
-      selectedItemColor: const Color(0xFF0A0596),
-      unselectedItemColor: const Color(0xFF9CA3AF),
-      items: const [
-        BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: 'Dashboard'),
-        BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: 'Jadwal'),
-        BottomNavigationBarItem(icon: Icon(Icons.checklist_rtl), label: 'Approval'),
-        BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: 'Profil'),
-      ],
-    );
-  }
+  // _buildBottomNav removed — dashboard provides navigation
 }

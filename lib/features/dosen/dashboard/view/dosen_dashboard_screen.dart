@@ -8,7 +8,7 @@ import '../../sesi/view/sesi_dosen_screen.dart';
 import '../../pergantian_jadwal/view/pergantian_jadwal_screen.dart';
 import '../../../profil/view/profil_screen.dart';
 import '../../rekap/view/rekap_dosen_screen.dart';
-import '../../approval/view/approval_screen.dart';
+import '../../izin/view/approval_dosen_screen.dart';
 import '../../izin/view/izin_dosen_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
@@ -96,7 +96,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       case 1:
         return RekapDosenScreen(user: widget.user);
       case 2:
-        return ApprovalScreen(user: widget.user);
+        return const ApprovalDosenScreen();
       case 3:
         return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
       default:
