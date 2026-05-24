@@ -55,6 +55,21 @@ class JadwalCacheService {
   }
 
   // ─────────────────────────────────────────────────────
+  // PUBLIC API — Dosen
+  // ─────────────────────────────────────────────────────
+
+  /// Jadwal mengajar dosen untuk HARI INI.
+  /// Offline-first: coba server kalau online, fallback ke cache lokal.
+  Future<List<Map<String, dynamic>>> getJadwalDosenHariIni(String dosenId) async {
+    return _getDosenFiltered(dosenId, hari: _hariIni());
+  }
+
+  /// Semua jadwal mengajar dosen (semua hari).
+  Future<List<Map<String, dynamic>>> getSemuaJadwalDosen(String dosenId) async {
+    return _getDosenFiltered(dosenId, hari: null);
+  }
+
+  // ─────────────────────────────────────────────────────
   // INTERNAL
   // ─────────────────────────────────────────────────────
 
@@ -116,6 +131,48 @@ class JadwalCacheService {
         debugPrint('[JadwalCache] failed cache one doc: $e');
       }
     }
+  }
+
+  // ─────────────────────────────────────────────────────
+  // DOSEN — internal
+  // ─────────────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> _getDosenFiltered(
+    String dosenId, {
+    required String? hari,
+  }) async {
+    // 1. Coba server kalau online.
+    if (ConnectivityService().isOnline.value) {
+      try {
+        final remote = hari == null
+            ? await DatabaseService().getAllJadwalDosen(dosenId)
+            : await DatabaseService().getJadwalDosen(dosenId);
+        await _writeJadwalCache(remote);
+        return remote;
+      } catch (e) {
+        debugPrint('[JadwalCache-Dosen] server fetch failed, fallback cache: $e');
+      }
+    }
+
+    // 2. Fallback ke cache: scan typed box untuk jadwal yg dosenIds-nya
+    //    mengandung dosen ini. Tidak butuh koleksi mapping terpisah karena
+    //    list-nya kecil (jadwal kampus 1 periode).
+    final box = HiveHelper.jadwalKuliahTypedBoxInstance;
+    final result = <JadwalKuliah>[];
+    for (final j in box.values) {
+      if (!j.isActive) continue;
+      if (!j.dosenIds.contains(dosenId)) continue;
+      if (hari != null && j.hari != hari) continue;
+      result.add(j);
+    }
+    result.sort((a, b) {
+      const urut = ['Senin', 'Selasa', 'Rabu', 'Kamis', 'Jumat', 'Sabtu', 'Minggu'];
+      final iA = urut.indexOf(a.hari);
+      final iB = urut.indexOf(b.hari);
+      if (iA != iB) return iA.compareTo(iB);
+      return a.jamMulai.compareTo(b.jamMulai);
+    });
+    return result.map((j) => j.toDisplayMap()).toList();
   }
 
   Future<void> _writeEnrollmentsCache(

@@ -29,21 +29,40 @@ class SesiDosenViewModel {
   Future<void> loadData() async {
     isLoading.value = true;
     try {
-      final data = await DatabaseService().getLaporanDosen(jadwalId, dosenId);
-      if (data != null) {
-        _currentLaporan = LaporanDosen.fromMap(data);
-        _applyData();
-        return;
-      }
-    } catch (e) {
+      // Strategi offline-first:
+      //   1. Cek Hive lokal dulu — sumber kebenaran untuk device ini.
+      //      Kalau dosen tadi sudah Mulai/Selesai Kuliah (di sini atau di
+      //      device lain yang sudah ke-sync), state-nya ada di Hive.
+      //   2. Kalau online, refresh dari Mongo. Server data overwrite local
+      //      cache supaya state up-to-date kalau dosen pakai 2 device.
+
       final box = HiveHelper.laporanDosenBoxInstance;
+      final today = DateTime.now();
       final localRecords = box.values
-          .where((r) => r.jadwalId == jadwalId && r.dosenId == dosenId && r.tanggal.day == DateTime.now().day)
+          .where((r) =>
+              r.jadwalId == jadwalId &&
+              r.dosenId == dosenId &&
+              r.tanggal.year == today.year &&
+              r.tanggal.month == today.month &&
+              r.tanggal.day == today.day)
           .toList();
       if (localRecords.isNotEmpty) {
         _currentLaporan = localRecords.first;
         _applyData();
-        return;
+      }
+
+      // Refresh dari server (best-effort).
+      try {
+        final data = await DatabaseService().getLaporanDosen(jadwalId, dosenId);
+        if (data != null) {
+          _currentLaporan = LaporanDosen.fromMap(data);
+          // Simpan juga ke Hive supaya cache up-to-date.
+          await box.put(_currentLaporan!.id, _currentLaporan!);
+          _applyData();
+        }
+      } catch (e) {
+        debugPrint('[SesiDosenVM] server fetch laporan failed (offline?): $e');
+        // Keep local state.
       }
     } finally {
       isLoading.value = false;
