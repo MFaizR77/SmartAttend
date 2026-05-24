@@ -5,7 +5,7 @@ import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/mahasiswa/izin/view/izin_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
-import 'features/dosen/tindak_lanjut_izin/view/tindak_lanjut_screen.dart';
+import 'features/dosen/izin/view/tindak_lanjut_izin_screen.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
 import 'features/admin/upload_jadwal/view/upload_jadwal_screen.dart';
 import 'features/admin/manajemen_periode/view/manajemen_periode_screen.dart';
@@ -169,7 +169,7 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
             final user = _authViewModel.currentUser.value;
             if (user == null) return _redirectToLogin();
             return MaterialPageRoute(
-              builder: (_) => TindakLanjutIzinScreen(user: user),
+              builder: (_) => const TindakLanjutIzinScreen(),
             );
 
           case '/admin/upload-jadwal':
