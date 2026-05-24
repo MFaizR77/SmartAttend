@@ -102,24 +102,24 @@ class _IzinDosenScreenState extends State<IzinDosenScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
-        backgroundColor: const Color(0xFF09039C),
+        backgroundColor: const Color(0xFF01018B),
         elevation: 0,
         toolbarHeight: 60,
         centerTitle: true,
         leadingWidth: 72,
         leading: Padding(
           padding: const EdgeInsets.only(left: 14, top: 8, bottom: 8),
-          child: Material(
-            color: const Color(0xFFFF9B00),
-            borderRadius: BorderRadius.circular(99),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(99),
-              onTap: () => Navigator.pop(context),
-              child: const SizedBox(
-                width: 34,
-                height: 34,
-                child: Icon(Icons.arrow_back, color: Colors.white, size: 18),
-              ),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFF8003),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
             ),
           ),
         ),
