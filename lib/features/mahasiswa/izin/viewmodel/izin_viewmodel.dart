@@ -128,6 +128,14 @@ class IzinViewModel {
       await HiveHelper.pengajuanIzinBoxInstance.put(clientUuid, izin);
 
       // Supplemental data (field yang tidak ada di model PengajuanIzin lokal).
+      // Tanggal disimpan sebagai UTC midnight (date-only) lalu di-encode ke ISO
+      // dengan suffix 'Z' agar konsisten dengan apa yang dikirim ke server,
+      // sehingga round-trip Mongo BSON tidak menggeser tanggal.
+      final tanggalUtc = DateTime.utc(
+        tanggalIzin.year,
+        tanggalIzin.month,
+        tanggalIzin.day,
+      );
       await HiveHelper.userBoxInstance.put(
         'izin_extra_$clientUuid',
         {
@@ -135,7 +143,7 @@ class IzinViewModel {
           'namaMahasiswa': user.nama,
           'kelas': user.kelas,
           'program': user.program,
-          'tanggalIzin': tanggalIzin.toIso8601String(),
+          'tanggalIzin': tanggalUtc.toIso8601String(),
           'jadwalIdsTerdampak': jadwalIds,
           'tindakLanjutDosen': tindakLanjut,
         },
@@ -150,7 +158,13 @@ class IzinViewModel {
             'namaMahasiswa': user.nama,
             'kelas': user.kelas,
             'program': user.program,
-            'tanggalIzin': tanggalIzin,
+            // Normalisasi ke UTC midnight (date-only) supaya tidak digeser
+            // timezone saat round-trip Mongo BSON ↔ DateTime.
+            'tanggalIzin': DateTime.utc(
+              tanggalIzin.year,
+              tanggalIzin.month,
+              tanggalIzin.day,
+            ),
             'jenis': jenis,
             'keterangan': keterangan,
             'fotoPath': fotoPath,
@@ -228,7 +242,11 @@ class IzinViewModel {
         }
       }
 
-      // Merge: hilangkan duplikat berdasar clientUuid (server > lokal).
+      // Merge: server adalah sumber kebenaran untuk **status & approval**,
+      // tapi metadata jadwal (jadwalIdsTerdampak, tindakLanjutDosen yang
+      // berisi namaMK/jam/dosen) dipertahankan dari local extras kalau
+      // server doc tidak punya — defensive terhadap dokumen lama yang
+      // tersinkron saat extras belum ikut dikirim.
       final byUuid = <String, Map<String, dynamic>>{};
       for (final m in localMaps) {
         final k = m['clientUuid']?.toString() ?? '';
@@ -236,7 +254,26 @@ class IzinViewModel {
       }
       for (final m in remote) {
         final k = m['clientUuid']?.toString() ?? '';
-        if (k.isNotEmpty) byUuid[k] = m; // override lokal
+        if (k.isEmpty) continue;
+        final localCopy = byUuid[k];
+        if (localCopy == null) {
+          byUuid[k] = m;
+        } else {
+          // Mulai dari server (untuk status terbaru), lalu fill missing field
+          // dari local (mis. jadwalIdsTerdampak yang tidak ikut sync).
+          final merged = Map<String, dynamic>.from(m);
+          for (final entry in localCopy.entries) {
+            final serverVal = merged[entry.key];
+            final localVal = entry.value;
+            final serverEmpty = serverVal == null ||
+                (serverVal is List && serverVal.isEmpty) ||
+                (serverVal is String && serverVal.isEmpty);
+            if (serverEmpty && localVal != null) {
+              merged[entry.key] = localVal;
+            }
+          }
+          byUuid[k] = merged;
+        }
       }
       final merged = byUuid.values.toList();
 

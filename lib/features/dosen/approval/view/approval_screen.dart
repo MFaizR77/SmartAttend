@@ -220,11 +220,14 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
     final jenis = izin['jenis']?.toString() ?? 'izin';
     final tgl = izin['tanggalIzin'];
     String tglStr = '-';
+    DateTime? parsed;
     if (tgl is DateTime) {
-      tglStr = DateFormat('d MMM yyyy', 'id_ID').format(tgl);
+      parsed = tgl;
     } else if (tgl is String) {
-      final p = DateTime.tryParse(tgl);
-      if (p != null) tglStr = DateFormat('d MMM yyyy', 'id_ID').format(p);
+      parsed = DateTime.tryParse(tgl);
+    }
+    if (parsed != null) {
+      tglStr = DateFormat('d MMM yyyy', 'id_ID').format(parsed.toUtc());
     }
     final tindakList = (izin['tindakLanjutDosen'] as List?) ?? const [];
 

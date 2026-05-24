@@ -599,7 +599,13 @@ class DatabaseService {
       if (tgl is DateTime) tglDate = tgl;
       else if (tgl is String) tglDate = DateTime.tryParse(tgl);
       if (tglDate == null) continue;
-      if (tglDate.year == now.year && tglDate.month == now.month && tglDate.day == now.day) {
+      // Tanggal izin disimpan sebagai UTC midnight (date-only). Bandingkan
+      // di UTC supaya tidak ter-shift oleh timezone lokal.
+      final tglUtc = tglDate.toUtc();
+      final nowUtc = now.toUtc();
+      if (tglUtc.year == nowUtc.year &&
+          tglUtc.month == nowUtc.month &&
+          tglUtc.day == nowUtc.day) {
         izinMap[mahId] = izin['jenis']?.toString() ?? 'izin';
       }
     }

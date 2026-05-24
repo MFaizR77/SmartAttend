@@ -745,11 +745,18 @@ class _IzinScreenState extends State<IzinScreen>
     final jenis = izin['jenis']?.toString() ?? 'izin';
     final tgl = izin['tanggalIzin'];
     String tglStr = '-';
+    DateTime? parsed;
     if (tgl is DateTime) {
-      tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(tgl);
+      parsed = tgl;
     } else if (tgl is String) {
-      final p = DateTime.tryParse(tgl);
-      if (p != null) tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(p);
+      parsed = DateTime.tryParse(tgl);
+    }
+    if (parsed != null) {
+      // Tanggal izin di Mongo disimpan sebagai UTC midnight (date-only).
+      // Format selalu pakai .toUtc() agar tidak ter-shift -1 hari di
+      // timezone WIB (+07:00).
+      final utc = parsed.toUtc();
+      tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(utc);
     }
 
     Color color;

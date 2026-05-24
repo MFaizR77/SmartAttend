@@ -119,34 +119,74 @@ class SyncManager {
   // ─────────────────────────────────────────────────────
   // 3. PengajuanIzin
   // ─────────────────────────────────────────────────────
+  //
+  // Catatan schema:
+  // Model `PengajuanIzin` di Hive hanya punya subset field workflow baru
+  // (sesiId, statusApproval, dll yg legacy). Field workflow lengkap
+  // (kelas, program, tanggalIzin, jadwalIdsTerdampak, tindakLanjutDosen,
+  // namaMahasiswa) disimpan terpisah di `userBox` dengan key
+  // `izin_extra_<clientUuid>` saat submit. Sync HARUS gabung keduanya
+  // sebelum push ke Mongo, kalau tidak Mongo bakal punya dokumen tanpa
+  // jadwalIdsTerdampak → wali tidak bisa approve, dosen tidak lihat,
+  // dan UI riwayat tampil "-".
 
   Future<int> _syncPengajuanIzin() async {
     final box = HiveHelper.pengajuanIzinBoxInstance;
+    final userBox = HiveHelper.userBoxInstance;
     final pending = box.values.where((p) => p.syncStatus == 'pending').toList();
     if (pending.isEmpty) return 0;
 
     int ok = 0;
     for (final izin in pending) {
       try {
-        // Kirim sebagai dokumen baru (insert). Server akan generate ObjectId
-        // kalau belum ada. Kalau sudah ada (re-submit accidental), unique
-        // index di clientUuid akan menolak — kita cek deduplication via
-        // clientUuid duluan agar tidak double.
-        final data = izin.toMap();
-        // Hapus field yang server-managed.
-        data.remove('_id');
-        // Tambah field tambahan yang perlu untuk workflow approval di server.
-        data['status'] ??= 'pending_wali';
-
-        // Best-effort: cek sudah ada di server berdasar clientUuid.
+        // Best-effort dedup: cek server.
         final exists = await DatabaseService()
             .izinExistsByClientUuid(izin.clientUuid);
+
         if (!exists) {
-          // Pakai ObjectId baru — server pakai ini sebagai _id.
-          data['_id'] = ObjectId();
-          await DatabaseService().submitIzinMahasiswa(data);
+          // Build payload lengkap = base lokal + extras dari userBox.
+          final extraRaw = userBox.get('izin_extra_${izin.clientUuid}');
+          final extra = extraRaw is Map
+              ? Map<String, dynamic>.from(extraRaw)
+              : <String, dynamic>{};
+
+          // tanggalIzin di extras tersimpan sebagai ISO string — convert ke
+          // DateTime supaya Mongo simpan sebagai BSON date.
+          DateTime? tanggalIzin;
+          final tglStr = extra['tanggalIzin']?.toString();
+          if (tglStr != null && tglStr.isNotEmpty) {
+            tanggalIzin = DateTime.tryParse(tglStr);
+          }
+
+          final payload = <String, dynamic>{
+            '_id': ObjectId(),
+            'clientUuid': izin.clientUuid,
+            'mahasiswaId': izin.mahasiswaId,
+            'namaMahasiswa': extra['namaMahasiswa'],
+            'kelas': extra['kelas'],
+            'program': extra['program'],
+            'tanggalIzin': tanggalIzin ?? izin.createdAt,
+            'jenis': izin.jenis,
+            'keterangan': izin.keterangan,
+            'fotoPath': izin.fotoPath,
+            'fotoUrl': izin.fotoUrl,
+            'jadwalIdsTerdampak':
+                (extra['jadwalIdsTerdampak'] as List?) ?? const [],
+            'tindakLanjutDosen':
+                (extra['tindakLanjutDosen'] as List?) ?? const [],
+            'status': 'pending_wali',
+          };
+
+          await DatabaseService().submitIzinMahasiswa(payload);
+          debugPrint(
+            '[SyncManager] izin ${izin.clientUuid} pushed '
+            '(${(extra['jadwalIdsTerdampak'] as List?)?.length ?? 0} jadwal)',
+          );
+        } else {
+          debugPrint('[SyncManager] izin ${izin.clientUuid} sudah ada di server, skip insert');
         }
 
+        // Mark synced di Hive.
         final synced = izin.markAsSynced();
         await box.put(synced.clientUuid, synced);
         ok++;
