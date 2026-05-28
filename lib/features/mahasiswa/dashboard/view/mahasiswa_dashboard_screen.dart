@@ -130,7 +130,10 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                 child: OutlinedButton(
                   onPressed: () => Navigator.pop(context, false),
                   style: OutlinedButton.styleFrom(
-                    side: const BorderSide(color: AppColors.primaryBlue, width: 1.5),
+                    side: const BorderSide(
+                      color: AppColors.primaryBlue,
+                      width: 1.5,
+                    ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(8),
                     ),
@@ -385,30 +388,28 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
 
         return Row(
           children: [
-            _buildStatCard('Hadir', '${stats['hadir'] ?? 0}'),
+            _buildStatCard('Hadir', '${stats['hadir'] ?? 0}', AppColors.success),
             const SizedBox(width: 12),
-            _buildStatCard('Izin', '${stats['izin'] ?? 0}'),
+            _buildStatCard('Izin', '${stats['izin'] ?? 0}', AppColors.warning),
             const SizedBox(width: 12),
-            _buildStatCard('Alpha', '${stats['alpha'] ?? 0}'),
+            _buildStatCard('Alpha', '${stats['alpha'] ?? 0}', AppColors.error),
           ],
         );
       },
     );
   }
 
-  Widget _buildStatCard(String label, String value) {
+  Widget _buildStatCard(String label, String value, Color textColor) {
     return Expanded(
       child: Container(
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: AppColors.grayDark, width: 2),
-          boxShadow: const [
+          boxShadow: [
             BoxShadow(
-              color: Color(0x19000000),
+              color: Colors.black.withOpacity(0.06),
               blurRadius: 12,
-              // offset: Offset(0, 6),
-              spreadRadius: -6,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
@@ -418,8 +419,8 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
             children: [
               Text(
                 value,
-                style: const TextStyle(
-                  color: AppColors.grayDark,
+                style: TextStyle(
+                  color: textColor,
                   fontFamily: 'Plus Jakarta Sans',
                   fontSize: 50,
                   fontWeight: FontWeight.w800,
