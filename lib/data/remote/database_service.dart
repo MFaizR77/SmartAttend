@@ -569,7 +569,9 @@ class DatabaseService {
       'sesiId': jadwalId,
     }).toList();
 
-    // Filter hari ini secara manual (handle DateTime & String)
+    // Filter hari ini secara manual (handle DateTime & String).
+    // `timestamp` dari Mongo BSON adalah UTC; pakai instant comparison
+    // (bukan kalender lokal vs UTC mismatch).
     final Map<String, String> presensiMap = {};
     for (final p in presensiRaw) {
       final mahId = p['mahasiswaId']?.toString() ?? '';
@@ -579,9 +581,21 @@ class DatabaseService {
       if (ts is DateTime) tsDate = ts;
       else if (ts is String) tsDate = DateTime.tryParse(ts);
       if (tsDate == null) continue;
+      // Compare di instant — startOfDay/endOfDay lokal di-convert UTC otomatis
+      // saat dibandingkan ke tsDate UTC.
       if (tsDate.isBefore(startOfDay) || tsDate.isAfter(endOfDay)) continue;
-      final status = p['status']?.toString() ?? 'hadir';
-      presensiMap[mahId] = status;
+
+      // Tentukan status: kalau ada field 'status' (override manual dosen),
+      // pakai itu. Kalau tidak, lihat statusHadir bool dari mahasiswa.
+      final overrideStatus = p['status']?.toString();
+      String statusFinal;
+      if (overrideStatus != null && overrideStatus.isNotEmpty) {
+        statusFinal = overrideStatus;
+      } else {
+        final hadir = p['statusHadir'];
+        statusFinal = (hadir == true || hadir == 'true') ? 'hadir' : 'belum';
+      }
+      presensiMap[mahId] = statusFinal;
     }
 
     // 4. Ambil izin/sakit yang berlaku hari ini dan menyertakan jadwalId ini
@@ -683,6 +697,19 @@ class DatabaseService {
   Future<void> insertRecordPresensi(Map<String, dynamic> record) async {
     await connect();
     final coll = _requireDb.collection('record_presensi');
+
+    // Idempotency: kalau sudah ada record dengan clientUuid sama, skip insert.
+    // Ini penting untuk SyncManager retry — koneksi flap tidak boleh bikin
+    // record duplikat.
+    final clientUuid = record['clientUuid']?.toString();
+    if (clientUuid != null && clientUuid.isNotEmpty) {
+      final existing = await coll.findOne({'clientUuid': clientUuid});
+      if (existing != null) {
+        // Sudah ada — anggap sukses, no-op.
+        return;
+      }
+    }
+
     if (!record.containsKey('_id')) record['_id'] = ObjectId();
     if (record['timestamp'] is String) {
       record['timestamp'] = DateTime.tryParse(record['timestamp']) ?? record['timestamp'];
@@ -698,18 +725,30 @@ class DatabaseService {
 
   Future<bool> checkPresensiExists(String sesiId, String mahasiswaId) async {
     await connect();
-    final now = DateTime.now();
-    final start = DateTime(now.year, now.month, now.day);
-    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
-    final r = await _requireDb.collection('record_presensi').findOne({
+    // Query luas — filter day-match di client supaya konsisten dengan
+    // logic timezone di getStatusPresensiMahasiswaByJadwal.
+    final list = await _requireDb.collection('record_presensi').find({
       'sesiId': sesiId,
       'mahasiswaId': mahasiswaId,
-      'timestamp': {
-        r'$gte': start.toIso8601String(),
-        r'$lte': end.toIso8601String(),
-      },
-    });
-    return r != null;
+    }).toList();
+    if (list.isEmpty) return false;
+
+    final now = DateTime.now();
+    for (final p in list) {
+      final ts = p['timestamp'];
+      DateTime? tsDate;
+      if (ts is DateTime) tsDate = ts;
+      else if (ts is String) tsDate = DateTime.tryParse(ts);
+      if (tsDate == null) continue;
+      // tsDate sudah UTC dari BSON; konversi ke lokal untuk cek hari yg sama.
+      final tsLocal = tsDate.toLocal();
+      if (tsLocal.year == now.year &&
+          tsLocal.month == now.month &&
+          tsLocal.day == now.day) {
+        return true;
+      }
+    }
+    return false;
   }
 
   // ─────────────────────────────────────────────────────

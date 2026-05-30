@@ -344,10 +344,20 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
               ]),
               const SizedBox(height: 4),
               Row(children: [
-                const Icon(Icons.calendar_view_day, size: 16, color: AppColors.grayMedium),
+                Icon(
+                  (izin['cakupan']?.toString() == 'sebagian')
+                      ? Icons.splitscreen_rounded
+                      : Icons.calendar_view_day,
+                  size: 16,
+                  color: AppColors.grayMedium,
+                ),
                 const SizedBox(width: 6),
-                Text('${jadwalIds.length} jadwal terdampak',
-                    style: const TextStyle(fontSize: 13)),
+                Text(
+                  izin['cakupan']?.toString() == 'sebagian'
+                      ? '${jadwalIds.length} mata kuliah (izin sebagian)'
+                      : '${jadwalIds.length} jadwal terdampak',
+                  style: const TextStyle(fontSize: 13),
+                ),
               ]),
               const SizedBox(height: 8),
               Text(

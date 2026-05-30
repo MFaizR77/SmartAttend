@@ -58,6 +58,11 @@ class IzinViewModel {
 
   /// Submit izin — offline-first.
   /// Selalu tulis ke Hive dulu, lalu trigger sync di background.
+  ///
+  /// [selectedJadwalIds] — kalau `null`, izin berlaku untuk SEMUA jadwal di
+  /// tanggal tsb (izin penuh, perilaku lama). Kalau diisi, hanya jadwal yang
+  /// ID-nya ada di list yang diizinkan (izin sebagian). Matkul lain di hari
+  /// itu tetap wajib presensi.
   Future<bool> submitIzin({
     required User user,
     required DateTime tanggalIzin,
@@ -65,20 +70,46 @@ class IzinViewModel {
     required String keterangan,
     String? fotoPath,
     String? fotoUrl,
+    List<String>? selectedJadwalIds,
   }) async {
     isLoading.value = true;
     errorMessage.value = null;
     try {
       // Pastikan preview ada untuk tanggal ini.
       await previewJadwalTerdampak(user: user, tanggal: tanggalIzin);
-      final jadwalIds = jadwalTerdampakPreview.value
+
+      // Filter jadwal sesuai pilihan. Kalau selectedJadwalIds null → semua.
+      final semuaJadwal = jadwalTerdampakPreview.value;
+      final List<Map<String, dynamic>> jadwalDipilih;
+      if (selectedJadwalIds == null) {
+        jadwalDipilih = semuaJadwal;
+      } else {
+        final selectedSet = selectedJadwalIds.toSet();
+        jadwalDipilih = semuaJadwal
+            .where((j) => selectedSet.contains(j['_id']?.toString() ?? ''))
+            .toList();
+      }
+
+      // Guard: minimal 1 jadwal harus terpilih (izin tanpa matkul tidak valid).
+      if (jadwalDipilih.isEmpty) {
+        errorMessage.value =
+            'Pilih minimal satu mata kuliah yang ingin diizinkan.';
+        return false;
+      }
+
+      final jadwalIds = jadwalDipilih
           .map((j) => j['_id']?.toString() ?? '')
           .where((s) => s.isNotEmpty)
           .toList();
 
+      // Cakupan: 'penuh' kalau semua jadwal hari itu diizinkan, 'sebagian'
+      // kalau hanya sebagian. Dipakai untuk label di UI & audit.
+      final cakupan =
+          jadwalDipilih.length >= semuaJadwal.length ? 'penuh' : 'sebagian';
+
       // Build tindakLanjutDosen (1 entry per dosen yg ngajar slot).
       final tindakLanjut = <Map<String, dynamic>>[];
-      for (final j in jadwalTerdampakPreview.value) {
+      for (final j in jadwalDipilih) {
         final jadwalId = j['_id']?.toString();
         if (jadwalId == null) continue;
         final dosenList = <String>{};
@@ -146,6 +177,7 @@ class IzinViewModel {
           'tanggalIzin': tanggalUtc.toIso8601String(),
           'jadwalIdsTerdampak': jadwalIds,
           'tindakLanjutDosen': tindakLanjut,
+          'cakupan': cakupan,
         },
       );
 
@@ -171,6 +203,7 @@ class IzinViewModel {
             'fotoUrl': fotoUrl,
             'jadwalIdsTerdampak': jadwalIds,
             'tindakLanjutDosen': tindakLanjut,
+            'cakupan': cakupan,
             'status': 'pending_wali',
           });
           // Mark synced.
@@ -223,6 +256,7 @@ class IzinViewModel {
           'fotoUrl': i.fotoUrl,
           'jadwalIdsTerdampak': extraMap['jadwalIdsTerdampak'] ?? const [],
           'tindakLanjutDosen': extraMap['tindakLanjutDosen'] ?? const [],
+          'cakupan': extraMap['cakupan'],
           'status': i.statusApproval == 'pending'
               ? 'pending_wali'
               : i.statusApproval,

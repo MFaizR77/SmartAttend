@@ -174,6 +174,7 @@ class SyncManager {
                 (extra['jadwalIdsTerdampak'] as List?) ?? const [],
             'tindakLanjutDosen':
                 (extra['tindakLanjutDosen'] as List?) ?? const [],
+            'cakupan': extra['cakupan'],
             'status': 'pending_wali',
           };
 
