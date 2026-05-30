@@ -9,6 +9,7 @@ import '../../../../core/services/jadwal_cache_service.dart';
 import '../../../../core/services/session_state_service.dart';
 import '../../../../core/services/sync_manager.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/jadwal_expander.dart';
 import '../../../../data/local/models/user.dart';
 import '../../../../data/local/models/record_presensi.dart';
 import '../../../../data/local/hive_helper.dart';
@@ -95,9 +96,13 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
         ),
       );
 
+      // Expand team teaching (khusus proyek) jadi 1 kartu per dosen.
+      // Display-only: semua kartu share jadwalId yang sama → absen tetap 1x.
+      final expanded = expandTeamTeaching(gabungan);
+
       if (!mounted) return;
       setState(() {
-        _jadwalHariIni = gabungan;
+        _jadwalHariIni = expanded;
         _isLoading = false;
       });
 
@@ -442,7 +447,10 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
     final jamMulai = jadwal['jamMulai']?.toString() ?? '-';
     final jamSelesai = jadwal['jamSelesai']?.toString() ?? '-';
     final ruangan = jadwal['ruangan']?.toString() ?? '-';
-    final dosenId = jadwal['dosenId']?.toString() ?? '-';
+    // Pakai namaDosen (gabungan team teaching) dulu, baru fallback ke single.
+    final dosenId = jadwal['namaDosen']?.toString().isNotEmpty == true
+        ? jadwal['namaDosen'].toString()
+        : (jadwal['dosenId']?.toString() ?? '-');
     final hadir = _isHadir[id] ?? false;
     final submitting = _isSubmitting[id] ?? false;
     final status = _sessionStatus[id];
@@ -582,7 +590,7 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
               Expanded(
                 child: Text(
                   dosenId,
-                  maxLines: 1,
+                  maxLines: 2,
                   overflow: TextOverflow.ellipsis,
                   style: TextStyle(
                     color: Colors.white.withOpacity(0.6),

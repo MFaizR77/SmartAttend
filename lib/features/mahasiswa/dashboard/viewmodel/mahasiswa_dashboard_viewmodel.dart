@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/services/connectivity_service.dart';
 import '../../../../core/services/jadwal_cache_service.dart';
+import '../../../../core/utils/jadwal_expander.dart';
 import '../../../../data/local/dummy_data.dart';
 import '../../../../data/local/models/user.dart';
 import '../../../../data/remote/database_service.dart';
@@ -29,12 +30,21 @@ class MahasiswaDashboardViewModel {
     // Jadwal regular — offline-first via cache.
     try {
       final jadwalDB = await JadwalCacheService().getJadwalHariIni(user.id);
-      jadwalHariIni.value = jadwalDB.map((doc) {
+
+      // Expand team teaching (khusus Proyek) jadi 1 kartu per dosen —
+      // display-only, consistent dengan JadwalScreen & AbsensiListScreen.
+      final expanded = expandTeamTeaching(jadwalDB);
+
+      jadwalHariIni.value = expanded.map((doc) {
+        final namaDosen = doc['namaDosen']?.toString() ??
+            doc['dosenId']?.toString() ??
+            '';
         return {
           'id': doc['_id']?.toString() ?? '',
           'mataKuliah': '${doc['namaMK']} (${doc['tipe']})',
           'jam': '${doc['jamMulai']} - ${doc['jamSelesai']}',
           'ruang': doc['ruangan']?.toString() ?? '-',
+          'dosen': namaDosen,
         };
       }).toList();
     } catch (e) {

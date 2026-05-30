@@ -742,7 +742,7 @@ class _IzinScreenState extends State<IzinScreen>
                       Expanded(
                         child: Text(
                           dosen,
-                          maxLines: 1,
+                          maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                           style: const TextStyle(
                             color: Color(0xFF9CA3AF),

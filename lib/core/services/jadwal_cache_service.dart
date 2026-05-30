@@ -90,11 +90,14 @@ class JadwalCacheService {
           final ids = await DatabaseService().getEnrolledJadwalIds(mahasiswaId);
           await _writeEnrollmentsCache(mahasiswaId, ids);
         } catch (_) {}
+        debugPrint('[JadwalCache] SERVER hit: ${remote.length} jadwal (mhs=$mahasiswaId, hari=$hari)');
         return remote;
       } catch (e) {
         debugPrint('[JadwalCache] server fetch failed, fallback cache: $e');
         // Lanjut ke cache.
       }
+    } else {
+      debugPrint('[JadwalCache] offline → pakai cache lokal (mhs=$mahasiswaId)');
     }
 
     // 2. Fallback ke cache lokal.

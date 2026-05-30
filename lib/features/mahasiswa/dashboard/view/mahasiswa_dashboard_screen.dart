@@ -569,6 +569,32 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                         height: 1.3,
                       ),
                     ),
+                    if ((jadwal['dosen'] ?? '').isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.person,
+                            size: 13,
+                            color: AppColors.softText,
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              jadwal['dosen']!,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                color: AppColors.softText,
+                                fontFamily: 'Plus Jakarta Sans',
+                                fontSize: 12,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ),
               ),

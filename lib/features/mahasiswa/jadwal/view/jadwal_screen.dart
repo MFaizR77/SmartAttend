@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/jadwal_expander.dart';
 import '../../../../data/local/models/user.dart';
 import '../viewmodel/jadwal_viewmodel.dart';
 
@@ -198,7 +199,7 @@ class _JadwalScreenState extends State<JadwalScreen> {
         children: [
           _buildDayHeader(selectedHari),
           const SizedBox(height: 12),
-          ...schedules.map((jadwal) {
+          ...expandTeamTeaching(schedules).map((jadwal) {
             final status = _vm.getStatusJadwal(jadwal);
             return Padding(
               padding: const EdgeInsets.only(bottom: 12),
@@ -385,7 +386,7 @@ class _JadwalScreenState extends State<JadwalScreen> {
                     Expanded(
                       child: Text(
                         namaDosen,
-                        maxLines: 1,
+                        maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
                           color: Color(0xFF9CA3AF),

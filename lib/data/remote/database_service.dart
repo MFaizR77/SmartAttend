@@ -348,16 +348,37 @@ class DatabaseService {
   /// Internal: ambil semua jadwalId aktif mahasiswa di periode aktif.
   /// HARUS dipanggil dari dalam callback `_withReconnect` (tidak antri di queue
   /// sendiri, supaya outer caller tidak deadlock).
+  ///
+  /// Filter periode dibuat permissive: match enrollment yang
+  /// `periodeAkademikKode == periodeKode` ATAU yang field-nya null/missing.
+  /// Ini melindungi dari data enrollment hasil seeder yang hanya punya field
+  /// `semester` (tanpa `periodeAkademikKode`), sehingga jadwal mahasiswa tidak
+  /// hilang gara-gara mismatch nama field.
   Future<List<String>> _enrolledJadwalIds(String mahasiswaId) async {
     final periode = await _getActivePeriodeRaw();
     final periodeKode = periode?['kode'] as String?;
-    final selector = <String, dynamic>{
-      'mahasiswaId': mahasiswaId,
-      'status': 'aktif',
-    };
-    if (periodeKode != null) {
-      selector['periodeAkademikKode'] = periodeKode;
+
+    final Map<String, dynamic> selector;
+    if (periodeKode == null) {
+      selector = {
+        'mahasiswaId': mahasiswaId,
+        'status': 'aktif',
+      };
+    } else {
+      selector = {
+        r'$and': [
+          {'mahasiswaId': mahasiswaId},
+          {'status': 'aktif'},
+          {
+            r'$or': [
+              {'periodeAkademikKode': periodeKode},
+              {'periodeAkademikKode': null}, // match null & missing field
+            ],
+          },
+        ],
+      };
     }
+
     final enrolls = await _requireDb.collection('enrollments').find(selector).toList();
     return enrolls
         .map((e) => e['jadwalId']?.toString() ?? '')
