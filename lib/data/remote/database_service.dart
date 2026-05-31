@@ -602,9 +602,9 @@ class DatabaseService {
     final result = mahasiswaIds.map((nim) {
       String status = 'belum';
       if (presensiMap.containsKey(nim)) {
-        final s = presensiMap[nim]!;
+        status = presensiMap[nim]!;
         // Status dari record_presensi bisa: hadir, alpha, izin, sakit (manual dosen)
-        status = (s == 'hadir' || s == 'alpha' || s == 'izin' || s == 'sakit') ? s : 'hadir';
+      // 2. Ambil nama mahasiswa
       } else if (izinMap.containsKey(nim)) {
         // Izin dari wali/mahasiswa
         status = izinMap[nim]!;
@@ -1252,6 +1252,269 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllMataKuliah() async {
     await connect();
     return _requireDb.collection('mata_kuliah').find().toList();
+  }
+
+  // ─────────────────────────────────────────────────────────
+  // ADMIN: REKAP & MANAJEMEN JADWAL
+  // ─────────────────────────────────────────────────────────
+
+  /// Ambil semua jadwal kuliah (untuk admin).
+  Future<List<Map<String, dynamic>>> getAllJadwalAdmin() async {
+    return _withReconnect(() async {
+      final list = await _requireDb.collection('jadwal_kuliah').find().toList();
+      return list;
+    });
+  }
+
+  /// Hapus jadwal berdasarkan ID.
+  Future<void> deleteJadwal(dynamic jadwalId) async {
+    return _withReconnect(() async {
+      await _requireDb.collection('jadwal_kuliah').deleteOne(where.eq('_id', jadwalId));
+    });
+  }
+
+  /// Update jadwal berdasarkan ID.
+  Future<void> updateJadwal(dynamic jadwalId, Map<String, dynamic> data) async {
+    return _withReconnect(() async {
+      await _requireDb
+          .collection('jadwal_kuliah')
+          .update(
+            where.eq('_id', jadwalId),
+            modify
+                .set('namaMK', data['namaMK'])
+                .set('hari', data['hari'])
+                .set('jamMulai', data['jamMulai'])
+                .set('jamSelesai', data['jamSelesai'])
+                .set('kodeRuangan', data['kodeRuangan']),
+          );
+    });
+  }
+
+  /// Rekap kehadiran semua mahasiswa per jadwal.
+  Future<List<Map<String, dynamic>>> getRekapKehadiranAdmin(String jadwalId) async {
+    return _withReconnect(() async {
+      DateTime? extractDate(Map<String, dynamic> doc, List<String> keys) {
+        for (final key in keys) {
+          final value = doc[key];
+          if (value is DateTime) return value;
+          if (value is String) {
+            final parsed = DateTime.tryParse(value);
+            if (parsed != null) return parsed;
+          }
+        }
+        return null;
+      }
+
+      int countUniqueDays(List<Map<String, dynamic>> docs, List<String> keys) {
+        final uniqueDays = <String>{};
+        for (final doc in docs) {
+          final date = extractDate(doc, keys);
+          if (date == null) continue;
+          uniqueDays.add(
+            '${date.year.toString().padLeft(4, '0')}-'
+            '${date.month.toString().padLeft(2, '0')}-'
+            '${date.day.toString().padLeft(2, '0')}',
+          );
+        }
+        return uniqueDays.length;
+      }
+
+      // support jadwalId stored as String or ObjectId in enrollments
+      final orClauses = <Map<String, dynamic>>[];
+      orClauses.add({'jadwalId': jadwalId});
+      try {
+        final oid = ObjectId.fromHexString(jadwalId);
+        orClauses.add({'jadwalId': oid});
+      } catch (_) {}
+
+      final enrollments = await _requireDb
+          .collection('enrollments')
+          .find({r'$or': orClauses})
+          .toList();
+      print('[DBG] getRekapKehadiranAdmin($jadwalId) -> enrollments=${enrollments.length}');
+      if (enrollments.isEmpty) {
+        print('[DBG] enrollments empty for jadwalId=$jadwalId; trying permissive fallback');
+        final allActive = await _requireDb.collection('enrollments').find({'status': 'aktif'}).toList();
+        final matched = allActive.where((e) {
+          final v = e['jadwalId'];
+          if (v == null) return false;
+          final s = v.toString();
+          if (s == jadwalId) return true;
+          if (s.contains(jadwalId)) return true;
+          try {
+            final oid = ObjectId.fromHexString(jadwalId);
+            if (v is ObjectId && v == oid) return true;
+            if (s == oid.toHexString()) return true;
+          } catch (_) {}
+          return false;
+        }).toList();
+        print('[DBG] fallback matched enrollments=${matched.length}');
+        enrollments.clear();
+        enrollments.addAll(matched);
+      }
+      if (enrollments.isNotEmpty) {
+        print('[DBG] enrollments sample ids: ${enrollments.take(3).map((e) => e['mahasiswaId']).toList()}');
+      }
+
+      final result = <Map<String, dynamic>>[];
+      for (final enroll in enrollments) {
+        final mahasiswaId = enroll['mahasiswaId']?.toString() ?? '';
+        var mhs = await _requireDb.collection('mahasiswa').findOne({r'_id': mahasiswaId});
+        if (mhs == null) {
+          try {
+            mhs = await _requireDb.collection('mahasiswa').findOne({r'_id': ObjectId.fromHexString(mahasiswaId)});
+          } catch (_) {}
+        }
+
+        // record_presensi biasanya memakai `sesiId`, bukan `jadwalId`.
+        final List<dynamic> sesiIds = <dynamic>[jadwalId];
+        try { sesiIds.add(ObjectId.fromHexString(jadwalId)); } catch (_) {}
+
+        final presensiList = await _requireDb.collection('record_presensi').find({
+          'sesiId': {r'$in': sesiIds},
+          'mahasiswaId': mahasiswaId,
+          r'$or': [
+            {'status': 'hadir'},
+            {'statusHadir': true},
+          ],
+        }).toList();
+        final hadir = countUniqueDays(presensiList, const ['timestamp', 'createdAt', 'updatedAt']);
+
+        final izinList = await _requireDb.collection('izin_mahasiswa').find({
+          'mahasiswaId': mahasiswaId,
+          'status': {r'$in': ['approved_wali', 'closed']},
+          'jadwalIdsTerdampak': {r'$in': [jadwalId]},
+        }).toList();
+        final izin = countUniqueDays(izinList, const ['tanggalIzin', 'createdAt', 'updatedAt']);
+
+        // Temporary business rule:
+        // if belum ada record presensi dan tidak ada izin, anggap hadir 1x dulu.
+        final hadirFinal = (hadir == 0 && izin == 0) ? 1 : hadir;
+
+        result.add({
+          'mahasiswaId': mahasiswaId,
+          'nama': mhs?['nama']?.toString() ?? '-',
+          'nim': mhs?['nim']?.toString() ?? mahasiswaId,
+          'hadir': hadirFinal,
+          'izin': izin,
+          'totalPertemuan': hadirFinal + izin,
+        });
+        if (result.length < 3) {
+          print('[DBG] mahasiswa $mahasiswaId -> hadir=$hadirFinal, izin=$izin');
+        }
+      }
+      return result;
+    });
+  }
+
+  /// Rekap kehadiran dosen untuk sebuah jadwal.
+  /// Output: list of { dosenId, nama, hadir, berhalangan, totalPertemuan, persen }
+  Future<List<Map<String, dynamic>>> getRekapKehadiranDosen(String jadwalId) async {
+    return _withReconnect(() async {
+      DateTime? _extractDate(Map<String, dynamic> doc, List<String> keys) {
+        for (final key in keys) {
+          final value = doc[key];
+          if (value is DateTime) return value;
+          if (value is String) {
+            final parsed = DateTime.tryParse(value);
+            if (parsed != null) return parsed;
+          }
+        }
+        return null;
+      }
+
+      int _countUniqueDates(List<Map<String, dynamic>> docs, List<String> keys) {
+        final uniqueDays = <String>{};
+        for (final doc in docs) {
+          final date = _extractDate(doc, keys);
+          if (date == null) continue;
+          uniqueDays.add('${date.year.toString().padLeft(4, '0')}-'
+              '${date.month.toString().padLeft(2, '0')}-'
+              '${date.day.toString().padLeft(2, '0')}');
+        }
+        return uniqueDays.length;
+      }
+
+      // Ambil jadwal untuk mengetahui dosen terkait (tolerant terhadap String/ObjectId id)
+      Map<String, dynamic>? jadwal = await _requireDb.collection('jadwal_kuliah').findOne(where.eq('_id', jadwalId));
+      if (jadwal == null) {
+        try {
+          jadwal = await _requireDb.collection('jadwal_kuliah').findOne(where.eq('_id', ObjectId.fromHexString(jadwalId)));
+        } catch (_) {}
+      }
+      List<dynamic> dosenIds = [];
+      if (jadwal != null) {
+        if (jadwal['dosenId'] != null) dosenIds.add(jadwal['dosenId']);
+        if (jadwal['kodeDosen'] != null) dosenIds.add(jadwal['kodeDosen']);
+        if (jadwal['dosenIds'] is List) dosenIds.addAll(jadwal['dosenIds']);
+      }
+
+      // normalize to strings
+      final dosenIdStrings = dosenIds.map((d) => d?.toString() ?? '').where((s) => s.isNotEmpty).toSet().toList();
+      print('[DBG] getRekapKehadiranDosen($jadwalId) -> dosenIds=$dosenIdStrings');
+
+      const totalPertemuanSemester = 14;
+
+      final List<Map<String, dynamic>> result = [];
+      for (final dsnId in dosenIdStrings) {
+        // try find dosen profile
+        var dosen = await _requireDb.collection('dosen').findOne(where.eq('_id', dsnId));
+        if (dosen == null) {
+          try {
+            dosen = await _requireDb.collection('dosen').findOne(where.eq('_id', ObjectId.fromHexString(dsnId)));
+          } catch (_) {}
+        }
+
+        // Prepare jadwalId variants for matching
+        final List<dynamic> jadwalIn = <dynamic>[jadwalId];
+        try { jadwalIn.add(ObjectId.fromHexString(jadwalId)); } catch (_) {}
+
+        // ambil dokumen laporan_dosen lalu hitung tanggal unik supaya seed duplikat
+        // atau kiriman ulang pada hari yang sama tidak menggandakan rekap.
+        final laporanList = await _requireDb.collection('laporan_dosen').find({
+          'jadwalId': {r'$in': jadwalIn},
+          'dosenId': dsnId,
+        }).toList();
+
+        final izinList = await _requireDb.collection('izin_dosen').find({
+          'jadwalId': {r'$in': jadwalIn},
+          'dosenId': dsnId,
+        }).toList();
+        final berhalangan = _countUniqueDates(izinList, const ['tanggalIzin', 'tanggal', 'createdAt']);
+
+        // Collect alasan/keterangan unik per tanggal (jaga agar tidak duplikat jika
+        // ada multiple izin pada hari yang sama). Prefer field names: keterangan, alasan, catatan.
+        final Map<String, String> alasanPerTanggal = {};
+        for (final iz in izinList) {
+          final d = _extractDate(iz, const ['tanggalIzin', 'tanggal', 'createdAt']);
+          if (d == null) continue;
+          final key = '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+          if (alasanPerTanggal.containsKey(key)) continue;
+          final a = (iz['keterangan'] ?? iz['alasan'] ?? iz['catatan'] ?? '')?.toString() ?? '';
+          if (a.trim().isNotEmpty) alasanPerTanggal[key] = a.trim();
+        }
+        final alasanList = alasanPerTanggal.values.toList();
+
+        if (laporanList.isNotEmpty) print('[DBG] contoh laporan_dosen: ${laporanList.first}');
+        if (izinList.isNotEmpty) print('[DBG] contoh izin_dosen: ${izinList.first}');
+
+        final total = totalPertemuanSemester;
+        final hadirs = (totalPertemuanSemester - berhalangan).clamp(0, totalPertemuanSemester);
+        final persen = (hadirs / totalPertemuanSemester) * 100.0;
+
+        result.add({
+          'dosenId': dsnId,
+          'nama': dosen?['nama']?.toString() ?? dosen?['name']?.toString() ?? '-',
+          'hadir': hadirs,
+          'berhalangan': berhalangan,
+          'totalPertemuan': total,
+          'persen': double.parse(persen.toStringAsFixed(1)),
+          'alasan': alasanList,
+        });
+      }
+
+      return result;
+    });
   }
 
   // ─────────────────────────────────────────────────────
