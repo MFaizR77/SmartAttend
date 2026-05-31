@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/services/jadwal_cache_service.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../../../data/remote/database_service.dart';
@@ -32,7 +33,7 @@ class JadwalViewModel {
 
     try {
       final allJadwal =
-          await DatabaseService().getSemuaJadwalMahasiswa(user.id);
+          await JadwalCacheService().getSemuaJadwal(user.id);
 
       final Map<String, List<Map<String, dynamic>>> grouped = {};
       for (final j in allJadwal) {

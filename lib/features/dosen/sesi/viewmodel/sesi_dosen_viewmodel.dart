@@ -5,6 +5,9 @@ import '../../../../data/remote/database_service.dart';
 import '../../../../data/local/hive_helper.dart';
 import '../../../../data/local/models/laporan_dosen.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/fcm_sender_service.dart';
+import '../../../../core/services/session_state_service.dart';
+import '../../../../core/services/sync_manager.dart';
 
 class SesiDosenViewModel {
   final String jadwalId;
@@ -27,21 +30,40 @@ class SesiDosenViewModel {
   Future<void> loadData() async {
     isLoading.value = true;
     try {
-      final data = await DatabaseService().getLaporanDosen(jadwalId, dosenId);
-      if (data != null) {
-        _currentLaporan = LaporanDosen.fromMap(data);
-        _applyData();
-        return;
-      }
-    } catch (e) {
+      // Strategi offline-first:
+      //   1. Cek Hive lokal dulu — sumber kebenaran untuk device ini.
+      //      Kalau dosen tadi sudah Mulai/Selesai Kuliah (di sini atau di
+      //      device lain yang sudah ke-sync), state-nya ada di Hive.
+      //   2. Kalau online, refresh dari Mongo. Server data overwrite local
+      //      cache supaya state up-to-date kalau dosen pakai 2 device.
+
       final box = HiveHelper.laporanDosenBoxInstance;
+      final today = DateTime.now();
       final localRecords = box.values
-          .where((r) => r.jadwalId == jadwalId && r.dosenId == dosenId && r.tanggal.day == DateTime.now().day)
+          .where((r) =>
+              r.jadwalId == jadwalId &&
+              r.dosenId == dosenId &&
+              r.tanggal.year == today.year &&
+              r.tanggal.month == today.month &&
+              r.tanggal.day == today.day)
           .toList();
       if (localRecords.isNotEmpty) {
         _currentLaporan = localRecords.first;
         _applyData();
-        return;
+      }
+
+      // Refresh dari server (best-effort).
+      try {
+        final data = await DatabaseService().getLaporanDosen(jadwalId, dosenId);
+        if (data != null) {
+          _currentLaporan = LaporanDosen.fromMap(data);
+          // Simpan juga ke Hive supaya cache up-to-date.
+          await box.put(_currentLaporan!.id, _currentLaporan!);
+          _applyData();
+        }
+      } catch (e) {
+        debugPrint('[SesiDosenVM] server fetch laporan failed (offline?): $e');
+        // Keep local state.
       }
     } finally {
       isLoading.value = false;
@@ -82,7 +104,14 @@ class SesiDosenViewModel {
     );
 
     await _saveData(laporan);
+    // Update cache lokal sesi supaya UI mahasiswa di device ini tahu (penting
+    // untuk skenario satu device dipakai bergantian, dan untuk konsistensi
+    // dengan SessionStateService).
+    await SessionStateService().markOpenedLocally(jadwalId);
     isLoading.value = false;
+
+    // Kirim notifikasi ke mahasiswa (best-effort, jangan ganggu flow utama)
+    _trySendAbsensiNotification();
 
     // Langsung load daftar mahasiswa & mulai auto-refresh
     await loadStatusMahasiswa();
@@ -109,6 +138,7 @@ class SesiDosenViewModel {
         );
 
     await _saveData(laporan);
+    await SessionStateService().markClosedLocally(jadwalId);
     await NotificationService().scheduleDailyReminder();
     isLoading.value = false;
   }
@@ -153,6 +183,42 @@ class SesiDosenViewModel {
     await loadStatusMahasiswa();
   }
 
+  /// Kirim push notification ke mahasiswa yang ter-enroll di jadwal ini.
+  /// Best-effort: jika gagal, hanya log error, tidak mengganggu flow utama.
+  Future<void> _trySendAbsensiNotification() async {
+    try {
+      final db = DatabaseService();
+
+      // Ambil info jadwal untuk nama mata kuliah
+      final jadwalInfo = await db.getJadwalInfo(jadwalId);
+      final namaMK = jadwalInfo?['namaMK']?.toString() ??
+          jadwalInfo?['mataKuliah']?.toString() ??
+          'Mata Kuliah';
+
+      // Ambil FCM token milik mahasiswa yang ter-enroll
+      final tokens = await db.getFcmTokensByJadwal(jadwalId);
+      if (tokens.isEmpty) {
+        print('[FCM] Tidak ada token mahasiswa untuk jadwal $jadwalId');
+        return;
+      }
+
+      // Kirim notifikasi
+      final sent = await FCMSenderService().sendNotificationToTokens(
+        tokens: tokens,
+        title: 'Absensi Dibuka',
+        body: 'Absensi $namaMK sudah dibuka, segera lakukan presensi',
+        data: {
+          'type': 'absensi_dibuka',
+          'jadwalId': jadwalId,
+        },
+      );
+
+      print('[FCM] Notifikasi terkirim ke $sent/${tokens.length} device');
+    } catch (e) {
+      print('[FCM] Gagal mengirim notifikasi: $e');
+    }
+  }
+
   void _startRefreshTimer() {
     _stopRefreshTimer();
     _refreshTimer = Timer.periodic(const Duration(seconds: 10), (_) {
@@ -176,7 +242,10 @@ class SesiDosenViewModel {
       await box.put(syncedLaporan.id, syncedLaporan);
       _currentLaporan = syncedLaporan;
     } catch (e) {
-      print('Gagal simpan online, tersimpan lokal: $e');
+      debugPrint('Gagal simpan online, tersimpan lokal: $e');
+      // Trigger sync queue — akan retry saat online.
+      // ignore: discarded_futures
+      SyncManager().syncAll();
     }
   }
 

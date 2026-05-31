@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
@@ -16,21 +18,32 @@ import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
+
+  // Inisialisasi connectivity (penting: harus sebelum SyncManager &
+  // login viewmodel agar status online sudah ter-update di awal).
+  await ConnectivityService().init();
 
   // Inisialisasi proses sinkronisasi background
   SyncManager().init();
 
   // Inisialisasi notifikasi & timezone
   tz.initializeTimeZones();
+  final jakarta = tz.getLocation('Asia/Jakarta');
+  tz.setLocalLocation(jakarta);
   await NotificationService().init();
 
   final authViewModel = AuthViewModel();

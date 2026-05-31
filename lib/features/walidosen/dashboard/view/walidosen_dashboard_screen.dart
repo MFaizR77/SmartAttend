@@ -595,11 +595,16 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
     final keterangan = izin['keterangan']?.toString() ?? '-';
     final tgl = izin['tanggalIzin'];
     String tglStr = '-';
+    DateTime? parsed;
     if (tgl is DateTime) {
-      tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(tgl);
+      parsed = tgl;
     } else if (tgl is String) {
-      final parsed = DateTime.tryParse(tgl);
-      if (parsed != null) tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(parsed);
+      parsed = DateTime.tryParse(tgl);
+    }
+    if (parsed != null) {
+      // Tanggal disimpan UTC midnight (date-only) — format pakai UTC supaya
+      // tidak ter-shift -1 hari di timezone WIB.
+      tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(parsed.toUtc());
     }
     final jadwalIds = (izin['jadwalIdsTerdampak'] as List?) ?? [];
 
@@ -690,10 +695,20 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
               ]),
               const SizedBox(height: 4),
               Row(children: [
-                const Icon(Icons.calendar_view_day, size: 16, color: AppColors.grayMedium),
+                Icon(
+                  (izin['cakupan']?.toString() == 'sebagian')
+                      ? Icons.splitscreen_rounded
+                      : Icons.calendar_view_day,
+                  size: 16,
+                  color: AppColors.grayMedium,
+                ),
                 const SizedBox(width: 6),
-                Text('${jadwalIds.length} jadwal terdampak',
-                    style: const TextStyle(fontSize: 13)),
+                Text(
+                  izin['cakupan']?.toString() == 'sebagian'
+                      ? '${jadwalIds.length} mata kuliah (izin sebagian)'
+                      : '${jadwalIds.length} jadwal terdampak',
+                  style: const TextStyle(fontSize: 13),
+                ),
               ]),
               const SizedBox(height: 8),
               Text(
