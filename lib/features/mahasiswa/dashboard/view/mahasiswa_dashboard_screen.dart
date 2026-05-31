@@ -386,9 +386,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
         return Row(
           children: [
             _buildStatCard('Hadir', '${stats['hadir'] ?? 0}'),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
             _buildStatCard('Izin', '${stats['izin'] ?? 0}'),
-            const SizedBox(width: 12),
+            const SizedBox(width: 8),
+            _buildStatCard('Sakit', '${stats['sakit'] ?? 0}'),
+            const SizedBox(width: 8),
             _buildStatCard('Alpha', '${stats['alpha'] ?? 0}'),
           ],
         );
