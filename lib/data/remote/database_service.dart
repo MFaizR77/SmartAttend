@@ -1,4 +1,6 @@
 import 'dart:async';
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:mongo_dart/mongo_dart.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 
@@ -1665,6 +1667,52 @@ class DatabaseService {
       'alpha': alpha,
       'total': hadir + izin + sakit + alpha,
     };
+  }
+
+  // ─────────────────────────────────────────────────────
+  // FCM TOKEN
+  // ─────────────────────────────────────────────────────
+
+  /// Simpan atau update FCM token untuk user tertentu.
+  /// Collection: `fcm_tokens`
+  /// Document: { _id, userId, accountType, token, platform, updatedAt }
+  Future<void> saveFcmToken({
+    required String userId,
+    required String accountType,
+    required String token,
+  }) async {
+    return _withReconnect(() async {
+      final coll = _requireDb.collection('fcm_tokens');
+      final platform = kIsWeb
+          ? 'web'
+          : Platform.isAndroid
+              ? 'android'
+              : Platform.isIOS
+                  ? 'ios'
+                  : Platform.isMacOS
+                      ? 'macos'
+                      : 'unknown';
+
+      await coll.replaceOne(
+        where.eq('userId', userId).eq('token', token),
+        {
+          '_id': ObjectId(),
+          'userId': userId,
+          'accountType': accountType,
+          'token': token,
+          'platform': platform,
+          'updatedAt': DateTime.now(),
+        },
+        upsert: true,
+      );
+    });
+  }
+
+  /// Hapus FCM token (misal saat logout).
+  Future<void> deleteFcmToken(String token) async {
+    return _withReconnect(() async {
+      await _requireDb.collection('fcm_tokens').deleteOne(where.eq('token', token));
+    });
   }
 
   // ─────────────────────────────────────────────────────

@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import '../../../core/services/connectivity_service.dart';
+import '../../../core/services/notification_service.dart';
 import '../../../data/local/hive_helper.dart';
 import '../../../data/local/models/user.dart';
 import '../../../data/remote/database_service.dart';
@@ -124,6 +125,8 @@ class AuthViewModel {
         await _persistSession(user);
         currentUser.value = user;
         errorMessage.value = null;
+        // Simpan FCM token ke MongoDB
+        NotificationService().saveTokenForUser(user.id, accountType.name);
       } else {
         // Server jawab, tapi credential salah. Coba match offline juga —
         // mungkin user pakai password lama tapi belum sync. Konservatif:
@@ -170,6 +173,8 @@ class AuthViewModel {
           await _persistSession(user);
           currentUser.value = user;
           errorMessage.value = null;
+          // Simpan FCM token ke MongoDB
+          NotificationService().saveTokenForUser(user.id, acc.name);
         } else {
           errorMessage.value = 'Username atau password salah';
         }
