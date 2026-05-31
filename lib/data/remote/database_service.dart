@@ -798,6 +798,43 @@ class DatabaseService {
     return _requireDb.collection('laporan_dosen').find({'dosenId': dosenId}).toList();
   }
 
+  /// Hitung kehadiran dosen di semester ini.
+  /// Return: {'hadir': X, 'total': Y}
+  /// - hadir: jumlah laporan_dosen yg punya waktuMulai (artinya dosen pernah mulai kelas)
+  /// - total: jumlah jadwal reguler dosen di periode aktif
+  Future<Map<String, int>> getKehadiranDosenSemester(String dosenId) async {
+    await connect();
+
+    // Ambil periode aktif
+    final periode = await _requireDb.collection('periode_akademik').findOne({'isAktif': true});
+    final periodeKode = periode?['kode']?.toString() ?? '';
+
+    // Total jadwal reguler di periode aktif
+    final selectorJadwal = <String, dynamic>{
+      r'$or': [
+        {'kodeDosen': dosenId},
+        {'dosenId': dosenId},
+        {'dosenIds': dosenId},
+      ],
+      if (periodeKode.isNotEmpty) 'periodeAkademikKode': periodeKode,
+    };
+    final jadwalList = await _requireDb.collection('jadwal_kuliah').find(selectorJadwal).toList();
+    final total = jadwalList.length;
+
+    // Hitung kehadiran: laporan_dosen yg punya waktuMulai (dosen masuk kelas)
+    final semuaLaporan = await _requireDb
+        .collection('laporan_dosen')
+        .find({'dosenId': dosenId}).toList();
+
+    int hadir = 0;
+    for (final lap in semuaLaporan) {
+      if (lap['waktuMulai'] != null) hadir++;
+    }
+
+    return {'hadir': hadir, 'total': total};
+  }
+
+
   Future<bool> isKelasBerjalan(String jadwalId) async {
     await connect();
     final now = DateTime.now();

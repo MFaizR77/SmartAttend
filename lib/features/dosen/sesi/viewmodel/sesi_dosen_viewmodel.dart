@@ -183,6 +183,14 @@ class SesiDosenViewModel {
     await loadStatusMahasiswa();
   }
 
+  /// Tandai banyak mahasiswa sekaligus (bulk action)
+  Future<void> tandaiStatusBulk(List<String> nimList, String status) async {
+    for (final nim in nimList) {
+      await DatabaseService().tandaiStatusMahasiswaByDosen(jadwalId, nim, status);
+    }
+    await loadStatusMahasiswa();
+  }
+
   /// Kirim push notification ke mahasiswa yang ter-enroll di jadwal ini.
   /// Best-effort: jika gagal, hanya log error, tidak mengganggu flow utama.
   Future<void> _trySendAbsensiNotification() async {

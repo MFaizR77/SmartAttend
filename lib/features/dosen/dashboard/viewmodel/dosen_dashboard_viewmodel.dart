@@ -2,32 +2,28 @@ import 'package:flutter/foundation.dart';
 
 import '../../../../core/services/jadwal_cache_service.dart';
 import '../../../../core/services/notification_service.dart';
-import '../../../../data/local/dummy_data.dart';
 import '../../../../data/local/models/user.dart';
+import '../../../../data/remote/database_service.dart';
 
 /// ViewModel dashboard dosen — **offline-first**.
 ///
 /// Jadwal mengajar di-load via [JadwalCacheService] yang otomatis fallback
-/// ke Hive cache kalau offline atau server timeout. Tidak ada try-catch
-/// ke service karena cache service yang handle fallback.
+/// ke Hive cache kalau offline atau server timeout.
 class DosenDashboardViewModel {
   final ValueNotifier<List<Map<String, String>>> jadwalMengajar =
       ValueNotifier([]);
-  final ValueNotifier<int> mahasiswaHadir = ValueNotifier(0);
-  final ValueNotifier<int> totalMahasiswa = ValueNotifier(0);
   final ValueNotifier<int> izinPending = ValueNotifier(0);
+
+  // Kehadiran dosen per semester
+  final ValueNotifier<int> kehadiranSemester = ValueNotifier(0);
+  final ValueNotifier<int> totalPertemuanSemester = ValueNotifier(0);
 
   bool _isDisposed = false;
 
   Future<void> loadData(User user) async {
     if (_isDisposed) return;
 
-    // Statistik masih dummy untuk MVP — bisa di-replace nanti dengan
-    // perhitungan dari cache lokal RecordPresensi.
-    mahasiswaHadir.value = DummyData.mahasiswaHadirHariIni;
-    totalMahasiswa.value = DummyData.totalMahasiswaKelas;
-    izinPending.value = DummyData.pengajuanIzinPending;
-
+    // Load jadwal hari ini
     try {
       final jadwalDB = await JadwalCacheService().getJadwalDosenHariIni(user.id);
       if (_isDisposed) return;
@@ -47,17 +43,28 @@ class DosenDashboardViewModel {
       NotificationService().checkAndScheduleLaporanReminder(user.id);
     } catch (e) {
       debugPrint('[DosenDashboardVM] load jadwal error: $e');
+    }
+
+    // Load kehadiran semester (best-effort, tidak blocking UI)
+    _loadKehadiranSemester(user.id);
+  }
+
+  Future<void> _loadKehadiranSemester(String dosenId) async {
+    try {
+      final result = await DatabaseService().getKehadiranDosenSemester(dosenId);
       if (_isDisposed) return;
-      // Cache service tidak throw — kalau sampai sini, error parsing.
-      // Biarkan list lama, jangan kosongkan.
+      kehadiranSemester.value = result['hadir'] ?? 0;
+      totalPertemuanSemester.value = result['total'] ?? 0;
+    } catch (e) {
+      debugPrint('[DosenDashboardVM] load kehadiran semester error: $e');
     }
   }
 
   void dispose() {
     _isDisposed = true;
     jadwalMengajar.dispose();
-    mahasiswaHadir.dispose();
-    totalMahasiswa.dispose();
     izinPending.dispose();
+    kehadiranSemester.dispose();
+    totalPertemuanSemester.dispose();
   }
 }
