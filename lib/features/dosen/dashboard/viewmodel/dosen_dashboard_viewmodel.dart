@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../../core/services/jadwal_cache_service.dart';
+import '../../../../core/services/notification_service.dart';
 import '../../../../data/local/dummy_data.dart';
 import '../../../../data/local/models/user.dart';
 
@@ -40,6 +41,10 @@ class DosenDashboardViewModel {
           'tipe': doc['tipe']?.toString() ?? 'Reguler',
         };
       }).toList();
+
+      // Schedule notifikasi terjadwal untuk dosen
+      NotificationService().scheduleAbsensiReminder(jadwalDB);
+      NotificationService().checkAndScheduleLaporanReminder(user.id);
     } catch (e) {
       debugPrint('[DosenDashboardVM] load jadwal error: $e');
       if (_isDisposed) return;

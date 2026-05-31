@@ -22,6 +22,7 @@ import 'core/services/connectivity_service.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -41,6 +42,8 @@ Future<void> main() async {
 
   // Inisialisasi notifikasi & timezone
   tz.initializeTimeZones();
+  final jakarta = tz.getLocation('Asia/Jakarta');
+  tz.setLocalLocation(jakarta);
   await NotificationService().init();
 
   final authViewModel = AuthViewModel();
