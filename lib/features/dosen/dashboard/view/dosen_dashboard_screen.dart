@@ -13,7 +13,7 @@ import '../../sesi/view/sesi_dosen_screen.dart';
 import '../../pergantian_jadwal/view/pergantian_jadwal_screen.dart';
 import '../../../profil/view/profil_screen.dart';
 import '../../rekap/view/rekap_dosen_screen.dart';
-import '../../approval/view/approval_screen.dart';
+import '../../izin/view/approval_dosen_screen.dart';
 import '../../izin/view/izin_dosen_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
@@ -217,7 +217,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       case 1:
         return RekapDosenScreen(user: widget.user);
       case 2:
-        return ApprovalScreen(user: widget.user);
+        return const ApprovalDosenScreen();
       case 3:
         return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
       default:
@@ -647,17 +647,17 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   Widget _buildMenuRow() {
     final menus = [
       {'icon': Icons.play_circle_outline, 'label': 'Sesi'},
-      {'icon': Icons.fact_check_outlined, 'label': 'Approval'},
-      {'icon': Icons.event_busy_outlined, 'label': 'Izin/Sakit'},
       {'icon': Icons.edit_calendar, 'label': 'Ganti Jadwal'},
+      {'icon': Icons.event_busy_outlined, 'label': 'Izin/Sakit'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: menus.map((menu) {
         return Expanded(
           child: Padding(
-            padding: EdgeInsets.only(right: menu == menus.last ? 0 : 10),
+            padding: EdgeInsets.only(right: menu == menus.last ? 0 : 12),
             child: GestureDetector(
               onTap: () {
                 if (menu['label'] == 'Ganti Jadwal') {
@@ -666,8 +666,6 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => IzinDosenScreen(user: widget.user)));
                 } else if (menu['label'] == 'Rekap') {
                   setState(() => _currentNavIndex = 1);
-                } else if (menu['label'] == 'Approval') {
-                  setState(() => _currentNavIndex = 2);
                 } else {
                   ScaffoldMessenger.of(context).showSnackBar(
                     const SnackBar(
@@ -680,34 +678,36 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
               child: Column(
                 children: [
                   Container(
-                    width: 76,
-                    height: 76,
+                    width: 56,
+                    height: 56,
                     decoration: BoxDecoration(
                       color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
+                      borderRadius: BorderRadius.circular(14),
                       border: Border.all(color: AppColors.border),
                       boxShadow: const [
                         BoxShadow(
                           color: Color(0x0C000000),
-                          blurRadius: 2,
-                          offset: Offset(0, 1),
+                          blurRadius: 6,
+                          offset: Offset(0, 3),
                         ),
                       ],
                     ),
-                    child: Icon(
-                      menu['icon'] as IconData,
-                      color: AppColors.primary,
-                      size: 30,
+                    child: Center(
+                      child: Icon(
+                        menu['icon'] as IconData,
+                        color: AppColors.primaryBlue,
+                        size: 22,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 10),
+                  const SizedBox(height: 8),
                   Text(
                     menu['label'] as String,
                     textAlign: TextAlign.center,
                     style: const TextStyle(
                       color: AppColors.textSecondary,
                       fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
+                      fontSize: 12,
                       fontWeight: FontWeight.w700,
                     ),
                   ),

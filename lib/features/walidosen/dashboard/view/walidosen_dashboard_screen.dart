@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/services/connectivity_service.dart';
 import '../../../../data/local/models/user.dart';
 import '../viewmodel/walidosen_dashboard_viewmodel.dart';
 
@@ -46,6 +47,7 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
     final id = izin['_id'];
     final action = await showModalBottomSheet<String>(
       context: context,
+      backgroundColor: AppColors.surface,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
@@ -67,18 +69,22 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
               padding: const EdgeInsets.symmetric(horizontal: 24),
               child: Text(
                 'Tindak Lanjut Izin\n${izin['namaMahasiswa'] ?? izin['mahasiswaId'] ?? ''}',
-                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                style: const TextStyle(
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
                 textAlign: TextAlign.center,
               ),
             ),
             const SizedBox(height: 8),
             ListTile(
-              leading: const Icon(Icons.check_circle, color: Colors.green),
+              leading: const Icon(Icons.check_circle, color: AppColors.success),
               title: const Text('Setujui (approve)'),
               onTap: () => Navigator.pop(ctx, 'approve'),
             ),
             ListTile(
-              leading: const Icon(Icons.cancel, color: Colors.red),
+              leading: const Icon(Icons.cancel, color: AppColors.error),
               title: const Text('Tolak (reject)'),
               onTap: () => Navigator.pop(ctx, 'reject'),
             ),
@@ -107,7 +113,7 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Batal')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
-              backgroundColor: action == 'approve' ? Colors.green : Colors.red,
+              backgroundColor: action == 'approve' ? AppColors.success : AppColors.error,
             ),
             onPressed: () => Navigator.pop(ctx, true),
             child: Text(action == 'approve' ? 'Setujui' : 'Tolak'),
@@ -144,44 +150,323 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.dashboardSurface,
-      appBar: AppBar(
-        title: Text('Wali Dosen — ${widget.user.kelasWali ?? "-"}${widget.user.program != null ? "-${widget.user.program}" : ""}'),
-        actions: [
-          IconButton(
-            tooltip: 'Refresh',
-            icon: const Icon(Icons.refresh),
-            onPressed: _refresh,
-          ),
-          IconButton(
-            tooltip: 'Logout',
-            icon: const Icon(Icons.logout),
-            onPressed: widget.onLogout,
-          ),
-        ],
-        bottom: TabBar(
-          controller: _tabCtrl,
-          labelColor: AppColors.primaryBlue,
-          unselectedLabelColor: AppColors.grayMedium,
-          indicatorColor: AppColors.primaryBlue,
-          tabs: const [
-            Tab(text: 'Pending'),
-            Tab(text: 'Riwayat'),
+      backgroundColor: AppColors.background,
+      body: SafeArea(
+        bottom: false,
+        child: Column(
+          children: [
+            _buildTopHeader(),
+            Expanded(
+              child: Container(
+                color: AppColors.surface,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+                      child: _buildOverviewCards(),
+                    ),
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: _buildFilterTabs(),
+                    ),
+                    const SizedBox(height: 8),
+                    Expanded(
+                      child: ValueListenableBuilder<bool>(
+                        valueListenable: _vm.isLoading,
+                        builder: (_, loading, __) {
+                          if (loading) {
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.primaryBlue,
+                              ),
+                            );
+                          }
+
+                          return ValueListenableBuilder<String?>(
+                            valueListenable: _vm.errorMessage,
+                            builder: (_, error, __) {
+                              if (error != null && error.isNotEmpty) {
+                                return _emptyState(error);
+                              }
+                              return TabBarView(
+                                controller: _tabCtrl,
+                                children: [
+                                  _buildPendingTab(),
+                                  _buildRiwayatTab(),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       ),
-      body: ValueListenableBuilder<bool>(
-        valueListenable: _vm.isLoading,
-        builder: (_, loading, __) {
-          if (loading) return const Center(child: CircularProgressIndicator());
-          return TabBarView(
-            controller: _tabCtrl,
+    );
+  }
+
+  Widget _buildTopHeader() {
+    final kelas = widget.user.kelasWali ?? '-';
+    final program = widget.user.program;
+    final labelKelas = program == null || program.isEmpty
+        ? 'Kelas $kelas'
+        : 'Kelas $kelas • $program';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+      decoration: const BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment(0.29, -0.41),
+          end: Alignment(0.71, 1.41),
+          colors: [Color(0xFF1A237E), Color(0xFF1E3A8A), Color(0xFF1565C0)],
+        ),
+        borderRadius: BorderRadius.vertical(bottom: Radius.circular(20)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
             children: [
-              _buildPendingTab(),
-              _buildRiwayatTab(),
+              Expanded(
+                child: Text(
+                  'Halo,\n${widget.user.nama}!',
+                  style: const TextStyle(
+                    color: AppColors.surface,
+                    fontFamily: 'Plus Jakarta Sans',
+                    fontWeight: FontWeight.w800,
+                    height: 1.1,
+                    fontSize: 28,
+                    letterSpacing: -0.6,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              _buildAvatar(widget.user.nama),
             ],
-          );
-        },
+          ),
+          const SizedBox(height: 18),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    _buildHeaderBadge(widget.user.roleLabel),
+                    _buildHeaderBadge(labelKelas),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              ValueListenableBuilder<bool>(
+                valueListenable: ConnectivityService().isOnline,
+                builder: (_, isOnline, __) => Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+                  decoration: BoxDecoration(
+                    color: isOnline
+                        ? Colors.white.withValues(alpha: 0.24)
+                        : Colors.red.withValues(alpha: 0.2),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isOnline
+                          ? AppColors.surface
+                          : Colors.red.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        isOnline ? Icons.wifi_rounded : Icons.wifi_off_rounded,
+                        color: isOnline ? AppColors.surface : Colors.red,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        isOnline ? 'Online' : 'Offline',
+                        style: TextStyle(
+                          color: isOnline ? AppColors.surface : Colors.red,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              _buildActionIcon(
+                icon: Icons.refresh_rounded,
+                tooltip: 'Refresh',
+                onTap: _refresh,
+              ),
+              const SizedBox(width: 8),
+              _buildActionIcon(
+                icon: Icons.logout_rounded,
+                tooltip: 'Logout',
+                onTap: widget.onLogout,
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeaderBadge(String text) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: AppColors.grayDark,
+          fontFamily: 'Plus Jakarta Sans',
+          fontSize: 12,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildActionIcon({
+    required IconData icon,
+    required String tooltip,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.2),
+      borderRadius: BorderRadius.circular(10),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(10),
+        onTap: onTap,
+        child: Tooltip(
+          message: tooltip,
+          child: Padding(
+            padding: const EdgeInsets.all(8),
+            child: Icon(icon, color: Colors.white, size: 20),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildOverviewCards() {
+    return Row(
+      children: [
+        Expanded(
+          child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: _vm.izinPending,
+            builder: (_, list, __) => _buildStatCard(
+              'Pending',
+              '${list.length}',
+              AppColors.warning,
+            ),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(
+          child: ValueListenableBuilder<List<Map<String, dynamic>>>(
+            valueListenable: _vm.izinSemua,
+            builder: (_, list, __) => _buildStatCard(
+              'Riwayat',
+              '${list.length}',
+              AppColors.primaryBlue,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildStatCard(String label, String value, Color valueColor) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x19000000), blurRadius: 12, spreadRadius: -6),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 14),
+        child: Column(
+          children: [
+            Text(
+              value,
+              style: TextStyle(
+                color: valueColor,
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 34,
+                fontWeight: FontWeight.w800,
+                height: 1,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              label,
+              style: const TextStyle(
+                color: AppColors.textSecondary,
+                fontFamily: 'Plus Jakarta Sans',
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFilterTabs() {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF3F4F8),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: TabBar(
+        controller: _tabCtrl,
+        dividerColor: Colors.transparent,
+        labelStyle: const TextStyle(
+          fontFamily: 'Plus Jakarta Sans',
+          fontWeight: FontWeight.w700,
+          fontSize: 13,
+        ),
+        unselectedLabelStyle: const TextStyle(
+          fontFamily: 'Plus Jakarta Sans',
+          fontWeight: FontWeight.w600,
+          fontSize: 13,
+        ),
+        labelColor: AppColors.primaryBlue,
+        unselectedLabelColor: AppColors.grayMedium,
+        indicatorSize: TabBarIndicatorSize.tab,
+        indicator: BoxDecoration(
+          color: AppColors.surface,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: AppColors.border),
+        ),
+        padding: const EdgeInsets.all(4),
+        tabs: const [
+          Tab(text: 'Pending'),
+          Tab(text: 'Riwayat'),
+        ],
       ),
     );
   }
@@ -231,12 +516,75 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(Icons.inbox_outlined, size: 56, color: Colors.grey[400]),
+          const Icon(
+            Icons.inbox_outlined,
+            size: 56,
+            color: AppColors.grayLight,
+          ),
           const SizedBox(height: 12),
-          Text(msg, style: TextStyle(color: Colors.grey[600])),
+          Text(
+            msg,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+              fontFamily: 'Plus Jakarta Sans',
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Widget _buildAvatar(String name) {
+    final initials = _initials(name);
+    return Container(
+      width: 52,
+      height: 52,
+      padding: const EdgeInsets.all(2),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFF8003),
+        shape: BoxShape.circle,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Container(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Color(0xFF3949AB), Color(0xFF1A237E)],
+          ),
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Text(
+            initials,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 17,
+              fontFamily: 'Plus Jakarta Sans',
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String fullName) {
+    final trimmed = fullName.trim();
+    if (trimmed.isEmpty) return 'U';
+    final parts = trimmed.split(RegExp(r'\s+'));
+    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+    final first = parts[0].substring(0, 1);
+    final second = parts[1].substring(0, 1);
+    return '$first$second'.toUpperCase();
   }
 
   Widget _buildIzinCard(Map<String, dynamic> izin, {required bool canAct}) {
@@ -287,6 +635,7 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
     return Card(
       child: InkWell(
         onTap: canAct ? () => _showActionSheet(izin) : null,
+        borderRadius: BorderRadius.circular(16),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
@@ -297,7 +646,9 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                     decoration: BoxDecoration(
-                      color: jenis == 'sakit' ? Colors.red[50] : Colors.blue[50],
+                      color: jenis == 'sakit'
+                          ? AppColors.error.withValues(alpha: 0.1)
+                          : AppColors.primaryBlue.withValues(alpha: 0.1),
                       borderRadius: BorderRadius.circular(4),
                     ),
                     child: Text(
@@ -305,7 +656,7 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: jenis == 'sakit' ? Colors.red[700] : Colors.blue[700],
+                        color: jenis == 'sakit' ? AppColors.error : AppColors.primaryBlue,
                       ),
                     ),
                   ),
