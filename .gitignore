@@ -49,3 +49,10 @@ artefak.md
 spesifikasi.md
 logbook-idham.md
 seeder.dart
+
+# Firebase & Laporan Akhir (Custom)
+firebase.json
+LaporanAkhir.md
+lib/core/services/fcm_sender_service.dart
+lib/firebase_options.dart
+smartattend-28ae2-firebase-adminsdk-fbsvc-2fe575c929.json
