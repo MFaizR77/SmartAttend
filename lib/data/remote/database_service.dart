@@ -1715,6 +1715,45 @@ class DatabaseService {
     });
   }
 
+  /// Ambil info jadwal (namaMK, kelas) berdasarkan jadwalId.
+  Future<Map<String, dynamic>?> getJadwalInfo(String jadwalId) async {
+    return _withReconnect(() async {
+      final doc = await _requireDb.collection('jadwal_kuliah').findOne(where.eq('_id', jadwalId));
+      return doc;
+    });
+  }
+
+  /// Ambil semua FCM token milik mahasiswa yang ter-enroll di jadwal tertentu.
+  Future<List<String>> getFcmTokensByJadwal(String jadwalId) async {
+    return _withReconnect(() async {
+      // 1. Ambil mahasiswaId dari enrollments
+      final enrollments = await _requireDb.collection('enrollments').find({
+        'jadwalId': jadwalId,
+        'status': 'aktif',
+      }).toList();
+
+      if (enrollments.isEmpty) return [];
+
+      final mahasiswaIds = enrollments
+          .map((e) => e['mahasiswaId']?.toString() ?? '')
+          .where((id) => id.isNotEmpty)
+          .toList();
+
+      if (mahasiswaIds.isEmpty) return [];
+
+      // 2. Ambil FCM token untuk mahasiswa-mahasiswa tersebut
+      final tokens = await _requireDb.collection('fcm_tokens').find({
+        'userId': {r'$in': mahasiswaIds},
+        'accountType': 'mahasiswa',
+      }).toList();
+
+      return tokens
+          .map((t) => t['token']?.toString() ?? '')
+          .where((t) => t.isNotEmpty)
+          .toList();
+    });
+  }
+
   // ─────────────────────────────────────────────────────
   // ADMIN: KENAIKAN KELAS / SEMESTER
   // ─────────────────────────────────────────────────────

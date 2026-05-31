@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -63,9 +65,32 @@ class NotificationService {
 
     print('FCM Authorization status: ${settings.authorizationStatus}');
 
-    // Dapatkan FCM token
-    _currentToken = await _firebaseMessaging.getToken();
-    print('FCM Token: $_currentToken');
+    // Dapatkan FCM token (iOS butuh APNS token dulu)
+    if (!kIsWeb && Platform.isIOS) {
+      // Tunggu APNS token tersedia (max 15 detik)
+      bool apnsReady = false;
+      for (int i = 0; i < 15; i++) {
+        try {
+          final apnsToken = await _firebaseMessaging.getAPNSToken();
+          if (apnsToken != null) {
+            apnsReady = true;
+            print('APNS Token tersedia');
+            break;
+          }
+        } catch (_) {}
+        await Future.delayed(const Duration(seconds: 1));
+      }
+
+      if (apnsReady) {
+        _currentToken = await _firebaseMessaging.getToken();
+        print('FCM Token: $_currentToken');
+      } else {
+        print('APNS token tidak tersedia setelah 15 detik, skip FCM');
+      }
+    } else {
+      _currentToken = await _firebaseMessaging.getToken();
+      print('FCM Token: $_currentToken');
+    }
 
     // Listen token refresh
     _firebaseMessaging.onTokenRefresh.listen((newToken) {
