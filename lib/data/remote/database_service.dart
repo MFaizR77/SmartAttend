@@ -99,6 +99,9 @@ class DatabaseService {
     return _db!;
   }
 
+  /// Public accessor untuk testing/cleanup.
+  Db get db => _requireDb;
+
   /// Mutex serial untuk operasi DB. mongo_dart tidak aman dipakai paralel dari
   /// banyak Future di koneksi yang sama (apalagi saat retry — reconnect
   /// menutup socket di tengah query lain → query yg lain hang/timeout).
