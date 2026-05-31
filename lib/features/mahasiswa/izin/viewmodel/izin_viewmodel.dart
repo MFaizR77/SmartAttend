@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../../core/services/connectivity_service.dart';
+import '../../../../core/services/fcm_sender_service.dart';
 import '../../../../core/services/jadwal_cache_service.dart';
 import '../../../../core/services/sync_manager.dart';
 import '../../../../data/local/hive_helper.dart';
@@ -209,6 +210,16 @@ class IzinViewModel {
           // Mark synced.
           await HiveHelper.pengajuanIzinBoxInstance
               .put(clientUuid, izin.markAsSynced());
+
+          // Kirim notifikasi ke walidosen (best-effort)
+          _tryNotifyWalidosen(
+            kelas: user.kelas ?? '',
+            program: user.program ?? '',
+            namaMahasiswa: user.nama,
+            mahasiswaId: user.id,
+            jenis: jenis,
+            tanggalIzin: tanggalIzin,
+          );
         } catch (e) {
           debugPrint('[IzinVM] online submit gagal, akan disync nanti: $e');
           // Tetap return true — data sudah di Hive, akan ter-sync nanti.
@@ -326,6 +337,45 @@ class IzinViewModel {
       errorMessage.value = 'Gagal memuat riwayat: $e';
     } finally {
       isLoading.value = false;
+    }
+  }
+
+  /// Kirim notifikasi ke walidosen saat mahasiswa submit izin.
+  Future<void> _tryNotifyWalidosen({
+    required String kelas,
+    required String program,
+    required String namaMahasiswa,
+    required String mahasiswaId,
+    required String jenis,
+    required DateTime tanggalIzin,
+  }) async {
+    try {
+      final db = DatabaseService();
+      final walidosenId = await db.getWalidosenIdByKelas(kelas, program);
+      if (walidosenId == null) {
+        debugPrint('[FCM] Walidosen tidak ditemukan untuk kelas $kelas');
+        return;
+      }
+
+      final tokens = await db.getFcmTokensByUserIds([walidosenId]);
+      if (tokens.isEmpty) {
+        debugPrint('[FCM] Token walidosen tidak ditemukan');
+        return;
+      }
+
+      final tanggal = '${tanggalIzin.day}/${tanggalIzin.month}/${tanggalIzin.year}';
+      final sent = await FCMSenderService().sendNotificationToTokens(
+        tokens: tokens,
+        title: 'Pengajuan Izin Baru',
+        body: '$namaMahasiswa mengajukan $jenis untuk tanggal $tanggal',
+        data: {
+          'type': 'pengajuan_izin',
+          'mahasiswaId': mahasiswaId,
+        },
+      );
+      debugPrint('[FCM] Notifikasi izin terkirim ke walidosen: $sent/${tokens.length}');
+    } catch (e) {
+      debugPrint('[FCM] Gagal notifikasi walidosen: $e');
     }
   }
 

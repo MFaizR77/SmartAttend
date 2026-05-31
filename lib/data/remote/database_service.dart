@@ -1138,6 +1138,14 @@ class DatabaseService {
     });
   }
 
+  /// Ambil satu dokumen izin_mahasiswa berdasarkan _id.
+  Future<Map<String, dynamic>?> getIzinById(dynamic izinId) async {
+    return _withReconnect(() async {
+      final oid = izinId is ObjectId ? izinId : ObjectId.fromHexString(izinId.toString());
+      return _requireDb.collection('izin_mahasiswa').findOne(where.id(oid));
+    });
+  }
+
   Future<void> approveIzinByWali({
     required dynamic izinId,
     required String walidosenId,
@@ -1747,6 +1755,37 @@ class DatabaseService {
         'accountType': 'mahasiswa',
       }).toList();
 
+      return tokens
+          .map((t) => t['token']?.toString() ?? '')
+          .where((t) => t.isNotEmpty)
+          .toList();
+    });
+  }
+
+  /// Ambil userId walidosen yang bertanggung jawab atas kelas tertentu.
+  Future<String?> getWalidosenIdByKelas(String kelas, String program) async {
+    return _withReconnect(() async {
+      // Cari di collection 'wali_dosen' berdasarkan kelasWali dan program
+      final doc = await _requireDb.collection('wali_dosen').findOne(
+        where.eq('kelasWali', kelas).eq('program', program),
+      );
+      if (doc != null) return doc['_id']?.toString() ?? doc['userId']?.toString();
+
+      // Fallback: cari tanpa filter program
+      final doc2 = await _requireDb.collection('wali_dosen').findOne(
+        where.eq('kelasWali', kelas),
+      );
+      return doc2?['_id']?.toString();
+    });
+  }
+
+  /// Ambil FCM token untuk beberapa userId (bisa walidosen, dosen, dll).
+  Future<List<String>> getFcmTokensByUserIds(List<String> userIds) async {
+    return _withReconnect(() async {
+      if (userIds.isEmpty) return [];
+      final tokens = await _requireDb.collection('fcm_tokens').find({
+        'userId': {r'$in': userIds},
+      }).toList();
       return tokens
           .map((t) => t['token']?.toString() ?? '')
           .where((t) => t.isNotEmpty)
