@@ -115,9 +115,7 @@ class ProfilScreen extends StatelessWidget {
                   const SizedBox(height: 20),
                   _buildSectionLabel('FITUR'),
                   const SizedBox(height: 10),
-                  _buildCard(
-                    children: _buildActionsForRole(context, user),
-                  ),
+                  _buildCard(children: _buildActionsForRole(context, user)),
                   const SizedBox(height: 20),
                   _buildCard(
                     children: [
@@ -457,12 +455,21 @@ class ProfilScreen extends StatelessWidget {
             subtitle: 'Approval izin tersedia di dashboard utama',
           ),
         ];
+      case AccountType.kaprodi:
+        return [
+          _buildInfoRow(
+            icon: Icons.school_rounded,
+            iconBg: AppColors.accent.withOpacity(0.2),
+            title: 'Mode Kaprodi',
+            subtitle: 'Kelola sesi absensi dosen di dashboard utama',
+          ),
+        ];
       case AccountType.admin:
         return [
           menuRow(
             icon: Icons.upload_file_outlined,
             title: 'Upload Jadwal',
-            subtitle: 'Import jadwal dari CSV',
+            subtitle: 'Import jadwal dari Excel',
             route: '/admin/upload-jadwal',
           ),
           _buildDivider(),
@@ -479,27 +486,33 @@ class ProfilScreen extends StatelessWidget {
             subtitle: 'Buat akun wali untuk kelas',
             route: '/admin/assign-wali',
           ),
+          _buildDivider(),
+          menuRow(
+            icon: Icons.school_rounded,
+            title: 'Assign Kaprodi',
+            subtitle: 'Buat akun kaprodi untuk prodi tertentu',
+            route: '/admin/assign-kaprodi',
+          ),
         ];
     }
   }
+}
 
-  }
+String _initials(String fullName) {
+  final trimmed = fullName.trim();
+  if (trimmed.isEmpty) return 'U';
+  final parts = trimmed.split(RegExp(r'\s+'));
+  if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
+  final first = parts[0].substring(0, 1);
+  final second = parts[1].substring(0, 1);
+  return '$first$second'.toUpperCase();
+}
 
-  String _initials(String fullName) {
-    final trimmed = fullName.trim();
-    if (trimmed.isEmpty) return 'U';
-    final parts = trimmed.split(RegExp(r'\s+'));
-    if (parts.length == 1) return parts.first.substring(0, 1).toUpperCase();
-    final first = parts[0].substring(0, 1);
-    final second = parts[1].substring(0, 1);
-    return '$first$second'.toUpperCase();
-  }
-
-  void _showComingSoon(BuildContext context) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Fitur ini belum tersedia'),
-        duration: Duration(seconds: 1),
-      ),
-    );
-  }
+void _showComingSoon(BuildContext context) {
+  ScaffoldMessenger.of(context).showSnackBar(
+    const SnackBar(
+      content: Text('Fitur ini belum tersedia'),
+      duration: Duration(seconds: 1),
+    ),
+  );
+}

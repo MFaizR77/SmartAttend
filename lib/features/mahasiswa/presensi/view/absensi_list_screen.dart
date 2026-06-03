@@ -5,6 +5,9 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/services/connectivity_service.dart';
+import '../../../../core/services/jadwal_cache_service.dart';
+import '../../../../core/services/session_state_service.dart';
+import '../../../../core/services/sync_manager.dart';
 import '../../../../core/theme/app_colors.dart';
 import '../../../../data/local/models/user.dart';
 import '../../../../data/local/models/record_presensi.dart';
@@ -28,10 +31,11 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
   // Per-jadwal state
   final Map<String, bool> _isHadir = {};
   final Map<String, bool> _isSubmitting = {};
-  final Map<String, bool> _isKelasBuka = {};
+  final Map<String, SessionStatus> _sessionStatus = {};
 
-  /// Polling status `isKelasBerjalan` setiap 15 detik supaya mahasiswa tidak
-  /// perlu pull-to-refresh manual setelah dosen membuka sesi.
+  /// Polling status sesi setiap 15 detik supaya mahasiswa tidak perlu
+  /// pull-to-refresh manual setelah dosen membuka sesi atau setelah
+  /// auto-open window terlewati.
   Timer? _statusPoller;
   static const Duration _pollInterval = Duration(seconds: 15);
 
@@ -54,24 +58,25 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
       _error = null;
     });
     try {
-      // 1. Ambil jadwal reguler — sekarang berbasis enrollments mahasiswa
-      //    (bukan lagi kelas+program), source of truth ada di koleksi enrollments.
-      final reguler = await DatabaseService().getJadwalMahasiswa(widget.user.id);
+      // 1. Ambil jadwal reguler — offline-first via cache.
+      final reguler = await JadwalCacheService().getJadwalHariIni(widget.user.id);
 
-      // 2. Ambil jadwal pengganti yang sudah disetujui (tetap berbasis kelas
-      //    karena pengganti di-approve admin per kelas, bukan per enrollment).
+      // 2. Ambil jadwal pengganti yang sudah disetujui (online only — kalau
+      //    offline, list pengganti dilewati saja).
       final kelas = widget.user.kelas ?? '';
-      final pengganti = kelas.isEmpty
-          ? const <Map<String, dynamic>>[]
-          : await DatabaseService().getJadwalPenggantiMahasiswa(kelas);
+      List<Map<String, dynamic>> pengganti = const [];
+      if (kelas.isNotEmpty && ConnectivityService().isOnline.value) {
+        try {
+          pengganti =
+              await DatabaseService().getJadwalPenggantiMahasiswa(kelas);
+        } catch (e) {
+          debugPrint('[AbsensiList] pengganti gagal: $e');
+        }
+      }
 
-      // 3. Gabungkan dan petakan (map) agar formatnya seragam
+      // 3. Gabungkan
       final List<Map<String, dynamic>> gabungan = [];
-
-      // Masukkan reguler
       gabungan.addAll(reguler);
-
-      // Masukkan pengganti (dengan pemetaan field)
       for (var p in pengganti) {
         gabungan.add({
           '_id': p['_id'],
@@ -84,8 +89,6 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
           'isPengganti': true,
         });
       }
-
-      // 4. Urutkan berdasarkan jam mulai
       gabungan.sort(
         (a, b) => (a['jamMulai'] as String? ?? '').compareTo(
           b['jamMulai'] as String? ?? '',
@@ -98,8 +101,10 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
         _isLoading = false;
       });
 
-      // Check status presensi & kelas untuk setiap jadwal sekali saat awal,
-      // lalu hidupkan poller untuk update otomatis.
+      // Sync pending records yang masih nunggu di Hive.
+      // ignore: discarded_futures
+      SyncManager().syncAll();
+
       await _refreshAllStatus();
       _startStatusPolling();
     } catch (e) {
@@ -114,20 +119,12 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
 
   /// Re-check status semua jadwal yang ada di list.
   Future<void> _refreshAllStatus() async {
-    final ids = _jadwalHariIni
-        .map((j) => j['_id']?.toString() ?? '')
-        .where((id) => id.isNotEmpty)
-        .toList();
-    if (ids.isEmpty) return;
-
-    // Hanya poll yang belum hadir & belum selesai jam pelajarannya — sisanya
-    // sudah final (hadir/selesai), tidak ada gunanya nge-hit DB lagi.
     for (final j in _jadwalHariIni) {
       final id = j['_id']?.toString() ?? '';
       if (id.isEmpty) continue;
       if (_isHadir[id] == true) continue;
       if (_isSelesai(j)) continue;
-      await _checkStatus(id);
+      await _checkStatus(j);
     }
   }
 
@@ -139,109 +136,130 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
     });
   }
 
-  Future<void> _checkStatus(String jadwalId) async {
-    try {
-      // Cek kelas buka dari laporan_dosen
-      final buka = await DatabaseService().isKelasBerjalan(jadwalId);
-      debugPrint('[AbsensiList] isKelasBerjalan($jadwalId) = $buka');
-      if (!mounted) return;
-      setState(() => _isKelasBuka[jadwalId] = buka);
+  Future<void> _checkStatus(Map<String, dynamic> jadwal) async {
+    final id = jadwal['_id']?.toString() ?? '';
+    if (id.isEmpty) return;
 
-      // Cek sudah hadir (lokal dulu, lalu online)
+    try {
+      // 1. Status sesi via SessionStateService (offline-first + auto-open)
+      final status = await SessionStateService().evaluate(
+        jadwalId: id,
+        jamMulai: jadwal['jamMulai']?.toString() ?? '',
+        jamSelesai: jadwal['jamSelesai']?.toString() ?? '',
+      );
+      debugPrint('[AbsensiList] sesi $id → ${status.state.name} | ${status.message}');
+      if (!mounted) return;
+      setState(() => _sessionStatus[id] = status);
+
+      // 2. Cek sudah hadir (lokal dulu, lalu online)
       final presensiBox = HiveHelper.recordPresensiBoxInstance;
       final now = DateTime.now();
       final localHadir = presensiBox.values.any(
         (r) =>
-            r.sesiId == jadwalId &&
+            r.sesiId == id &&
             r.mahasiswaId == widget.user.id &&
             r.timestamp.day == now.day &&
             r.timestamp.month == now.month &&
             r.timestamp.year == now.year,
       );
-
       if (localHadir) {
         if (!mounted) return;
-        setState(() => _isHadir[jadwalId] = true);
+        setState(() => _isHadir[id] = true);
         return;
       }
 
-      final online = await ConnectivityService().checkNow();
-      if (online) {
-        final exists = await DatabaseService().checkPresensiExists(
-          jadwalId,
-          widget.user.id,
-        );
-        if (!mounted) return;
-        setState(() => _isHadir[jadwalId] = exists);
+      if (ConnectivityService().isOnline.value) {
+        try {
+          final exists = await DatabaseService().checkPresensiExists(
+            id,
+            widget.user.id,
+          );
+          if (!mounted) return;
+          setState(() => _isHadir[id] = exists);
+        } catch (e) {
+          debugPrint('[AbsensiList] checkPresensiExists $id error: $e');
+        }
       }
     } catch (e, st) {
-      debugPrint('[AbsensiList] _checkStatus($jadwalId) error: $e');
-      debugPrint('$st');
+      debugPrint('[AbsensiList] _checkStatus($id) error: $e\n$st');
     }
   }
 
-  Future<void> _doCheckIn(String jadwalId) async {
-    if (_isSubmitting[jadwalId] == true) return;
+  Future<void> _doCheckIn(Map<String, dynamic> jadwal) async {
+    final id = jadwal['_id']?.toString() ?? '';
+    if (id.isEmpty) return;
+    if (_isSubmitting[id] == true) return;
 
-    // Re-check status kelas dari server sebelum submit (agar tidak stale)
-    try {
-      final buka = await DatabaseService().isKelasBerjalan(jadwalId);
-      if (mounted) setState(() => _isKelasBuka[jadwalId] = buka);
-    } catch (_) {}
+    // Re-check status sesi sebelum submit (anti-stale).
+    final status = await SessionStateService().evaluate(
+      jadwalId: id,
+      jamMulai: jadwal['jamMulai']?.toString() ?? '',
+      jamSelesai: jadwal['jamSelesai']?.toString() ?? '',
+    );
+    if (mounted) setState(() => _sessionStatus[id] = status);
 
-    if (_isKelasBuka[jadwalId] != true) {
+    if (!status.canCheckIn) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text(
-            'Absen ditolak: Sesi kelas belum dibuka atau sudah diakhiri oleh dosen.',
-          ),
+        SnackBar(
+          content: Text('Absen ditolak: ${status.message}'),
           backgroundColor: AppColors.error,
         ),
       );
       return;
     }
 
-    setState(() => _isSubmitting[jadwalId] = true);
+    setState(() => _isSubmitting[id] = true);
 
     try {
-      final isOnline = await ConnectivityService().checkNow();
+      final isOnline = ConnectivityService().isOnline.value;
 
       final record = RecordPresensi(
         clientUuid: const Uuid().v4(),
-        sesiId: jadwalId,
+        sesiId: id,
         mahasiswaId: widget.user.id,
         timestamp: DateTime.now(),
         statusHadir: true,
-        metode: 'manual',
-        syncStatus: isOnline ? 'synced' : 'pending',
+        metode: status.checkInMetode, // 'manual' atau 'auto'
+        syncStatus: isOnline ? 'pending' : 'pending',
       );
 
-      if (isOnline) {
-        await DatabaseService().insertRecordPresensi(record.toMap());
-      }
+      // Tulis ke Hive dulu (offline-first).
       final box = HiveHelper.recordPresensiBoxInstance;
       await box.put(record.clientUuid, record);
 
+      // Kalau online, langsung sync (best-effort).
+      if (isOnline) {
+        try {
+          await DatabaseService().insertRecordPresensi(record.toMap());
+          await box.put(record.clientUuid, record.markAsSynced());
+        } catch (e) {
+          debugPrint('[AbsensiList] online insert gagal, akan disync nanti: $e');
+          // ignore: discarded_futures
+          SyncManager().syncAll();
+        }
+      }
+
       if (!mounted) return;
       setState(() {
-        _isHadir[jadwalId] = true;
-        _isSubmitting[jadwalId] = false;
+        _isHadir[id] = true;
+        _isSubmitting[id] = false;
       });
 
+      final autoLabel = status.checkInMetode == 'auto' ? ' (auto-open)' : '';
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
             isOnline
-                ? '✅ Presensi berhasil disimpan!'
-                : '📶 Presensi offline dicatat, akan disinkronkan.',
+                ? '✅ Presensi berhasil disimpan$autoLabel!'
+                : '📶 Presensi offline dicatat$autoLabel, akan disinkronkan.',
           ),
           backgroundColor: AppColors.success,
         ),
       );
     } catch (e) {
       if (!mounted) return;
-      setState(() => _isSubmitting[jadwalId] = false);
+      setState(() => _isSubmitting[id] = false);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Gagal menyimpan presensi: $e'),
@@ -427,7 +445,7 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
     final dosenId = jadwal['dosenId']?.toString() ?? '-';
     final hadir = _isHadir[id] ?? false;
     final submitting = _isSubmitting[id] ?? false;
-    final kelasBuka = _isKelasBuka[id];
+    final status = _sessionStatus[id];
 
     return Container(
       decoration: BoxDecoration(
@@ -449,21 +467,44 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Status badge — dynamic berdasarkan kelasBuka
+          // Status badge — dynamic berdasarkan SessionState
           Builder(
             builder: (_) {
-              final buka = kelasBuka;
               String badgeLabel;
               Color badgeColor;
               Color badgeBorder;
-              if (buka == true) {
-                badgeLabel = 'BERLANGSUNG';
-                badgeColor = const Color(0xFF69F0AE);
-                badgeBorder = const Color(0x5969F0AE);
-              } else {
-                badgeLabel = 'BELUM DIMULAI';
-                badgeColor = const Color(0xFFFFB74D);
-                badgeBorder = const Color(0x59FFB74D);
+              switch (status?.state) {
+                case SessionState.open:
+                  badgeLabel = 'BERLANGSUNG';
+                  badgeColor = const Color(0xFF69F0AE);
+                  badgeBorder = const Color(0x5969F0AE);
+                  break;
+                case SessionState.autoOpen:
+                  badgeLabel = 'AUTO-OPEN';
+                  badgeColor = const Color(0xFF80D8FF);
+                  badgeBorder = const Color(0x5980D8FF);
+                  break;
+                case SessionState.waitingDosen:
+                  badgeLabel = 'MENUNGGU DOSEN';
+                  badgeColor = const Color(0xFFFFB74D);
+                  badgeBorder = const Color(0x59FFB74D);
+                  break;
+                case SessionState.closed:
+                  badgeLabel = 'DITUTUP';
+                  badgeColor = const Color(0xFFB0BEC5);
+                  badgeBorder = const Color(0x59B0BEC5);
+                  break;
+                case SessionState.expired:
+                  badgeLabel = 'SELESAI';
+                  badgeColor = const Color(0xFFB0BEC5);
+                  badgeBorder = const Color(0x59B0BEC5);
+                  break;
+                case SessionState.beforeWindow:
+                case null:
+                  badgeLabel = 'BELUM DIMULAI';
+                  badgeColor = const Color(0xFFFFB74D);
+                  badgeBorder = const Color(0x59FFB74D);
+                  break;
               }
               return Container(
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -586,8 +627,8 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
             ),
           ),
 
-          // Warning jika dosen belum membuka sesi
-          if (!hadir && kelasBuka != true) ...[
+          // Pesan kontekstual berdasarkan SessionState
+          if (!hadir && status != null && !status.canCheckIn) ...[
             const SizedBox(height: 14),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
@@ -596,18 +637,18 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.orange.withOpacity(0.3)),
               ),
-              child: const Row(
+              child: Row(
                 children: [
-                  Icon(
+                  const Icon(
                     Icons.hourglass_top_rounded,
                     color: Colors.orange,
                     size: 16,
                   ),
-                  SizedBox(width: 8),
+                  const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Menunggu dosen membuka sesi kelas',
-                      style: TextStyle(
+                      status.message,
+                      style: const TextStyle(
                         color: Colors.orange,
                         fontSize: 12,
                         fontFamily: 'Plus Jakarta Sans',
@@ -620,11 +661,43 @@ class _AbsensiListScreenState extends State<AbsensiListScreen> {
             ),
           ],
 
-          // Check-in button — hanya muncul jika kelas sudah dibuka dosen
-          if (!hadir && kelasBuka == true) ...[
+          // Auto-open notice — kasih tahu mahasiswa kalau dia pakai jalur auto.
+          if (!hadir && status?.state == SessionState.autoOpen) ...[
+            const SizedBox(height: 14),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFF80D8FF).withOpacity(0.15),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF80D8FF).withOpacity(0.4),
+                ),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.bolt_rounded, color: Color(0xFF80D8FF), size: 16),
+                  SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Sesi auto-open (dosen belum buka). Kehadiran tetap dicatat.',
+                      style: TextStyle(
+                        color: Color(0xFF80D8FF),
+                        fontSize: 12,
+                        fontFamily: 'Plus Jakarta Sans',
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+
+          // Check-in button — muncul kalau status.canCheckIn.
+          if (!hadir && status != null && status.canCheckIn) ...[
             const SizedBox(height: 14),
             GestureDetector(
-              onTap: submitting ? null : () => _doCheckIn(id),
+              onTap: submitting ? null : () => _doCheckIn(jadwal),
               child: AnimatedContainer(
                 duration: const Duration(milliseconds: 200),
                 width: double.infinity,

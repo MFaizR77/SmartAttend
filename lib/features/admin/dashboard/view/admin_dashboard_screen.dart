@@ -9,6 +9,7 @@ import '../../../profil/view/profil_screen.dart';
 import '../../manajemen_user/view/manajemen_user_screen.dart';
 import '../../manajemen_jadwal/view/manajemen_jadwal_screen.dart';
 import '../../rekap/view/rekap_admin_screen.dart';
+import '../../kenaikan_kelas/view/kenaikan_kelas_screen.dart';
 
 class AdminDashboardScreen extends StatefulWidget {
   final User user;
@@ -471,81 +472,91 @@ class _AdminDashboardScreenState extends State<AdminDashboardScreen> {
       {'icon': Icons.people, 'label': 'Users'},
       {'icon': Icons.domain_verification, 'label': 'Approval'},
       {'icon': Icons.calendar_month, 'label': 'Jadwal'},
+      {'icon': Icons.school_rounded, 'label': 'Kenaikan'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
 
-    return Row(
-      children: menus.map((menu) {
-        return Expanded(
-          child: Padding(
-            padding: EdgeInsets.only(right: menu == menus.last ? 0 : 10),
-            child: GestureDetector(
-              onTap: () {
-                if (menu['label'] == 'Approval') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => const ApprovalJadwalScreen(),
-                    ),
-                  );
-                } else if (menu['label'] == 'Users') {
-                  setState(() => _currentNavIndex = 1);
-                } else if (menu['label'] == 'Jadwal') {
-                  setState(() => _currentNavIndex = 2);
-                } else if (menu['label'] == 'Rekap') {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (_) => const RekapAdminScreen()),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Fitur ini belum tersedia'),
-                      duration: Duration(seconds: 1),
-                    ),
-                  );
-                }
-              },
-              child: Column(
-                children: [
-                  Container(
-                    width: 76,
-                    height: 76,
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
-                      border: Border.all(color: AppColors.border),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x0C000000),
-                          blurRadius: 2,
-                          offset: Offset(0, 1),
+    return Column(
+      children: [
+        Row(
+          children: menus.map((menu) {
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: menu == menus.last ? 0 : 10),
+                child: GestureDetector(
+                  onTap: () {
+                    if (menu['label'] == 'Approval') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const ApprovalJadwalScreen(),
                         ),
-                      ],
-                    ),
-                    child: Icon(
-                      menu['icon'] as IconData,
-                      color: AppColors.primary,
-                      size: 30,
-                    ),
+                      );
+                    } else if (menu['label'] == 'Users') {
+                      setState(() => _currentNavIndex = 1);
+                    } else if (menu['label'] == 'Jadwal') {
+                      setState(() => _currentNavIndex = 2);
+                    } else if (menu['label'] == 'Kenaikan') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const KenaikanKelasScreen()),
+                      );
+                    } else if (menu['label'] == 'Rekap') {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const RekapAdminScreen()),
+                      );
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Fitur ini belum tersedia'),
+                          duration: Duration(seconds: 1),
+                        ),
+                      );
+                    }
+                  },
+                  child: Column(
+                    children: [
+                      Container(
+                        width: 76,
+                        height: 76,
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: AppColors.border),
+                          boxShadow: const [
+                            BoxShadow(
+                              color: Color(0x0C000000),
+                              blurRadius: 2,
+                              offset: Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Icon(
+                          menu['icon'] as IconData,
+                          color: AppColors.primary,
+                          size: 30,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      Text(
+                        menu['label'] as String,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          color: AppColors.textSecondary,
+                          fontFamily: 'Plus Jakarta Sans',
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 10),
-                  Text(
-                    menu['label'] as String,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      color: AppColors.textSecondary,
-                      fontFamily: 'Plus Jakarta Sans',
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+                ),
               ),
-            ),
-          ),
-        );
-      }).toList(),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 

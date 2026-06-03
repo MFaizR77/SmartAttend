@@ -55,6 +55,7 @@ class _LoginFormState extends State<LoginForm> {
       case AccountType.mahasiswa: return 'Masukkan NIM';
       case AccountType.dosen: return 'Masukkan kode dosen (mis. KO009N)';
       case AccountType.walidosen: return 'Masukkan kode wali dosen (mis. WD_KO071N_2B_D3)';
+      case AccountType.kaprodi: return 'Masukkan kode kaprodi (mis. KP_KO071N_D3)';
       case AccountType.admin: return 'Masukkan kode admin';
     }
   }
@@ -64,6 +65,7 @@ class _LoginFormState extends State<LoginForm> {
       case AccountType.mahasiswa: return 'Mahasiswa';
       case AccountType.dosen: return 'Dosen';
       case AccountType.walidosen: return 'Wali Dosen';
+      case AccountType.kaprodi: return 'Kaprodi';
       case AccountType.admin: return 'Admin';
     }
   }
@@ -288,6 +290,7 @@ class _LoginFormState extends State<LoginForm> {
       case AccountType.mahasiswa: return Icons.school_outlined;
       case AccountType.dosen: return Icons.person_outline;
       case AccountType.walidosen: return Icons.supervisor_account_outlined;
+      case AccountType.kaprodi: return Icons.school_rounded;
       case AccountType.admin: return Icons.admin_panel_settings_outlined;
     }
   }

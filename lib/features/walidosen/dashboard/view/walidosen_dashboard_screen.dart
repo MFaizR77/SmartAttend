@@ -638,9 +638,8 @@ class _WaliDosenDashboardScreenState extends State<WaliDosenDashboardScreen>
       tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(tgl);
     } else if (tgl is String) {
       final parsed = DateTime.tryParse(tgl);
-      if (parsed != null) {
+      if (parsed != null)
         tglStr = DateFormat('EEEE, d MMM yyyy', 'id_ID').format(parsed);
-      }
     }
     final jadwalIds = (izin['jadwalIdsTerdampak'] as List?) ?? [];
 

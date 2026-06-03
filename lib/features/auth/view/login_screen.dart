@@ -44,6 +44,9 @@ class _LoginScreenState extends State<LoginScreen> {
       case AccountType.walidosen:
         route = '/walidosen';
         break;
+      case AccountType.kaprodi:
+        route = '/kaprodi';
+        break;
       case AccountType.admin:
         route = '/admin';
         break;

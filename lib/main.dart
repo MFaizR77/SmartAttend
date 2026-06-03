@@ -10,12 +10,15 @@ import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
 import 'features/admin/upload_jadwal/view/upload_jadwal_screen.dart';
 import 'features/admin/manajemen_periode/view/manajemen_periode_screen.dart';
 import 'features/admin/assign_wali/view/assign_wali_screen.dart';
+import 'features/admin/assign_kaprodi/view/assign_kaprodi_screen.dart';
 import 'features/walidosen/dashboard/view/walidosen_dashboard_screen.dart';
+import 'features/kaprodi/dashboard/view/kaprodi_dashboard_screen.dart';
 import 'features/onboarding/view/onboarding_screen.dart';
 import 'data/local/hive_helper.dart';
 import 'data/local/models/user.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'core/services/connectivity_service.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
@@ -25,6 +28,10 @@ Future<void> main() async {
   await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
+
+  // Inisialisasi connectivity (penting: harus sebelum SyncManager &
+  // login viewmodel agar status online sudah ter-update di awal).
+  await ConnectivityService().init();
 
   // Inisialisasi proses sinkronisasi background
   SyncManager().init();
@@ -48,6 +55,9 @@ Future<void> main() async {
         break;
       case AccountType.walidosen:
         initialRoute = '/walidosen';
+        break;
+      case AccountType.kaprodi:
+        initialRoute = '/kaprodi';
         break;
       case AccountType.admin:
         initialRoute = '/admin';
@@ -148,6 +158,16 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
               ),
             );
 
+          case '/kaprodi':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (ctx) => KaprodiDashboardScreen(
+                user: user,
+                onLogout: () => _handleLogout(ctx),
+              ),
+            );
+
           case '/admin':
             final user = _authViewModel.currentUser.value;
             if (user == null) return _redirectToLogin();
@@ -191,6 +211,13 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
             if (user == null) return _redirectToLogin();
             return MaterialPageRoute(
               builder: (_) => AssignWaliScreen(user: user),
+            );
+
+          case '/admin/assign-kaprodi':
+            final user = _authViewModel.currentUser.value;
+            if (user == null) return _redirectToLogin();
+            return MaterialPageRoute(
+              builder: (_) => AssignKaprodiScreen(user: user),
             );
 
           default:

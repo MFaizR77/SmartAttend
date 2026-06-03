@@ -1,5 +1,5 @@
 /// Tipe akun login. Setiap tipe punya koleksi MongoDB dan dashboard sendiri.
-enum AccountType { mahasiswa, dosen, walidosen, admin }
+enum AccountType { mahasiswa, dosen, walidosen, admin, kaprodi }
 
 /// Backward-compat: alias lama `UserRole`.
 /// Beberapa file masih merujuk `UserRole.mahasiswa/dosen/admin`.
@@ -51,6 +51,8 @@ class User {
         return 'Wali Dosen';
       case AccountType.admin:
         return 'Admin';
+      case AccountType.kaprodi:
+        return 'Kepala Program Studi';
     }
   }
 
@@ -99,6 +101,9 @@ class User {
         case 'walidosen':
           acc = AccountType.walidosen;
           break;
+        case 'kaprodi':
+          acc = AccountType.kaprodi;
+          break;
         default:
           acc = AccountType.mahasiswa;
       }
@@ -111,6 +116,7 @@ class User {
         break;
       case AccountType.dosen:
       case AccountType.walidosen:
+      case AccountType.kaprodi:
         roleMap = UserRole.dosen;
         break;
       case AccountType.admin:
