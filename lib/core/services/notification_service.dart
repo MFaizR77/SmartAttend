@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:timezone/timezone.dart' as tz;
+import '../../../data/local/hive_helper.dart';
 import '../../../data/remote/database_service.dart';
 
 // Harus top-level function untuk background handler
@@ -17,105 +18,120 @@ class NotificationService {
   NotificationService._internal();
 
   final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-  FlutterLocalNotificationsPlugin();
-  final FirebaseMessaging _firebaseMessaging = FirebaseMessaging.instance;
+      FlutterLocalNotificationsPlugin();
+
+  // Lazy — hanya dibuat setelah Firebase.initializeApp() berhasil
+  FirebaseMessaging? _firebaseMessaging;
   String? _currentToken;
 
   Future<void> init() async {
     // Android settings
     const AndroidInitializationSettings initializationSettingsAndroid =
-    AndroidInitializationSettings('@mipmap/ic_launcher');
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
-    //  iOS settings
+    // iOS settings
     const DarwinInitializationSettings initializationSettingsIOS =
-    DarwinInitializationSettings(
+        DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
       requestCriticalPermission: false,
     );
 
-    // android dan ios
     const InitializationSettings initializationSettings =
-    InitializationSettings(
+        InitializationSettings(
       android: initializationSettingsAndroid,
       iOS: initializationSettingsIOS,
     );
 
-
     await flutterLocalNotificationsPlugin.initialize(
       initializationSettings,
       onDidReceiveNotificationResponse: (NotificationResponse response) {
-        // Handle notification tap (optional)
-        print('Notification tapped: ${response.payload}');
+        debugPrint('[Notif] Tapped: ${response.payload}');
       },
     );
 
-    // Inisialisasi FCM
+    // Inisialisasi FCM — best-effort, tidak crash jika Firebase belum init
     await _initFCM();
   }
 
   Future<void> _initFCM() async {
-    // Minta izin notifikasi (penting untuk iOS & Android 13+)
-    NotificationSettings settings = await _firebaseMessaging.requestPermission(
-      alert: true,
-      badge: true,
-      sound: true,
-    );
+    try {
+      // FirebaseMessaging.instance akan throw jika Firebase belum diinit
+      _firebaseMessaging = FirebaseMessaging.instance;
 
-    print('FCM Authorization status: ${settings.authorizationStatus}');
+      // Minta izin notifikasi
+      final settings = await _firebaseMessaging!.requestPermission(
+        alert: true,
+        badge: true,
+        sound: true,
+      );
+      debugPrint('[FCM] Authorization: ${settings.authorizationStatus}');
 
-    // Dapatkan FCM token (iOS butuh APNS token dulu)
-    if (!kIsWeb && Platform.isIOS) {
-      // Tunggu APNS token tersedia (max 15 detik)
-      bool apnsReady = false;
-      for (int i = 0; i < 15; i++) {
-        try {
-          final apnsToken = await _firebaseMessaging.getAPNSToken();
-          if (apnsToken != null) {
-            apnsReady = true;
-            print('APNS Token tersedia');
-            break;
-          }
-        } catch (_) {}
-        await Future.delayed(const Duration(seconds: 1));
-      }
-
-      if (apnsReady) {
-        _currentToken = await _firebaseMessaging.getToken();
-        print('FCM Token: $_currentToken');
+      // Dapatkan token
+      if (!kIsWeb && Platform.isIOS) {
+        bool apnsReady = false;
+        for (int i = 0; i < 15; i++) {
+          try {
+            final apnsToken = await _firebaseMessaging!.getAPNSToken();
+            if (apnsToken != null) {
+              apnsReady = true;
+              break;
+            }
+          } catch (_) {}
+          await Future.delayed(const Duration(seconds: 1));
+        }
+        if (apnsReady) {
+          _currentToken = await _firebaseMessaging!.getToken();
+        } else {
+          debugPrint('[FCM] APNS tidak tersedia setelah 15 detik, skip.');
+        }
       } else {
-        print('APNS token tidak tersedia setelah 15 detik, skip FCM');
+        _currentToken = await _firebaseMessaging!.getToken();
       }
-    } else {
-      _currentToken = await _firebaseMessaging.getToken();
-      print('FCM Token: $_currentToken');
-    }
+      debugPrint('[FCM] Token: $_currentToken');
 
-    // Listen token refresh
-    _firebaseMessaging.onTokenRefresh.listen((newToken) {
-      _currentToken = newToken;
-      print('FCM Token refreshed: $newToken');
-    });
+      // ✅ Simpan token ke Hive untuk akses offline
+      if (_currentToken != null) {
+        await HiveHelper.userBoxInstance.put('fcm_token', _currentToken);
+      }
 
-    // Handle pesan saat app foreground
-    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('Foreground message: ${message.notification?.title}');
-      _showFCMNotification(message);
-    });
+      // Listen token refresh → update cache lokal
+      _firebaseMessaging!.onTokenRefresh.listen((token) {
+        _currentToken = token;
+        HiveHelper.userBoxInstance.put('fcm_token', token);
+        debugPrint('[FCM] Token refreshed & saved: $token');
+      });
 
-    // Handle pesan saat app di-background/terminated dan user tap notifikasi
-    FirebaseMessaging.onMessageOpenedApp.listen((RemoteMessage message) {
-      print('Notification clicked! ${message.data}');
-    });
+      // Foreground message
+      FirebaseMessaging.onMessage.listen((msg) {
+        debugPrint('[FCM] Foreground: ${msg.notification?.title}');
+        _showFCMNotification(msg);
+      });
 
-    // Background handler
-    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+      // Background tap
+      FirebaseMessaging.onMessageOpenedApp.listen((msg) {
+        debugPrint('[FCM] Opened: ${msg.data}');
+      });
 
-    // Cek apakah app dibuka dari notifikasi (terminated state)
-    RemoteMessage? initialMessage = await _firebaseMessaging.getInitialMessage();
-    if (initialMessage != null) {
-      print('App opened from notification: ${initialMessage.data}');
+      // Background handler
+      FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+      // Terminated state
+      final initialMsg = await _firebaseMessaging!.getInitialMessage();
+      if (initialMsg != null) {
+        debugPrint('[FCM] Opened from terminated: ${initialMsg.data}');
+      }
+    } catch (e) {
+      // Firebase belum diinit — baca token dari cache lokal Hive jika ada
+      final cachedToken = HiveHelper.userBoxInstance.get('fcm_token') as String?;
+      if (cachedToken != null) {
+        _currentToken = cachedToken;
+        debugPrint('[FCM] Firebase tidak tersedia, pakai token cache: $cachedToken');
+      } else {
+        debugPrint('[FCM] Tidak tersedia & tidak ada cache: $e');
+      }
+      _firebaseMessaging = null;
     }
   }
 
@@ -128,9 +144,9 @@ class NotificationService {
         accountType: accountType,
         token: _currentToken!,
       );
-      print('FCM token saved for $userId ($accountType)');
+      debugPrint('[FCM] Token saved for $userId ($accountType)');
     } catch (e) {
-      print('Gagal simpan FCM token: $e');
+      debugPrint('[FCM] Gagal simpan token: $e');
     }
   }
 
