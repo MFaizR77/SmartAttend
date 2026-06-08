@@ -5,6 +5,7 @@ import '../../../../data/remote/database_service.dart';
 import '../../../../data/local/hive_helper.dart';
 import '../../../../data/local/models/laporan_dosen.dart';
 import '../../../../core/services/notification_service.dart';
+import '../../../../core/services/fcm_sender_service.dart';
 import '../../../../core/services/session_state_service.dart';
 import '../../../../core/services/sync_manager.dart';
 
@@ -109,6 +110,9 @@ class SesiDosenViewModel {
     await SessionStateService().markOpenedLocally(jadwalId);
     isLoading.value = false;
 
+    // Kirim notifikasi ke mahasiswa (best-effort, jangan ganggu flow utama)
+    _trySendAbsensiNotification();
+
     // Langsung load daftar mahasiswa & mulai auto-refresh
     await loadStatusMahasiswa();
     _startRefreshTimer();
@@ -177,6 +181,42 @@ class SesiDosenViewModel {
   Future<void> tandaiStatus(String nim, String status) async {
     await DatabaseService().tandaiStatusMahasiswaByDosen(jadwalId, nim, status);
     await loadStatusMahasiswa();
+  }
+
+  /// Kirim push notification ke mahasiswa yang ter-enroll di jadwal ini.
+  /// Best-effort: jika gagal, hanya log error, tidak mengganggu flow utama.
+  Future<void> _trySendAbsensiNotification() async {
+    try {
+      final db = DatabaseService();
+
+      // Ambil info jadwal untuk nama mata kuliah
+      final jadwalInfo = await db.getJadwalInfo(jadwalId);
+      final namaMK = jadwalInfo?['namaMK']?.toString() ??
+          jadwalInfo?['mataKuliah']?.toString() ??
+          'Mata Kuliah';
+
+      // Ambil FCM token milik mahasiswa yang ter-enroll
+      final tokens = await db.getFcmTokensByJadwal(jadwalId);
+      if (tokens.isEmpty) {
+        print('[FCM] Tidak ada token mahasiswa untuk jadwal $jadwalId');
+        return;
+      }
+
+      // Kirim notifikasi
+      final sent = await FCMSenderService().sendNotificationToTokens(
+        tokens: tokens,
+        title: 'Absensi Dibuka',
+        body: 'Absensi $namaMK sudah dibuka, segera lakukan presensi',
+        data: {
+          'type': 'absensi_dibuka',
+          'jadwalId': jadwalId,
+        },
+      );
+
+      print('[FCM] Notifikasi terkirim ke $sent/${tokens.length} device');
+    } catch (e) {
+      print('[FCM] Gagal mengirim notifikasi: $e');
+    }
   }
 
   void _startRefreshTimer() {

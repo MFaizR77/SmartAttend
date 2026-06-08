@@ -24,17 +24,38 @@ class _IzinScreenState extends State<IzinScreen>
   String _jenis = 'sakit';
   final _keteranganCtrl = TextEditingController();
 
+  /// Jadwal yang dipilih untuk diizinkan. Default: semua jadwal di tanggal
+  /// terpilih (izin penuh). Mahasiswa bisa uncheck untuk izin sebagian.
+  final Set<String> _selectedJadwalIds = {};
+
   @override
   void initState() {
     super.initState();
     _vm = IzinViewModel();
     _tabCtrl = TabController(length: 2, vsync: this);
+    // Saat preview jadwal berubah (ganti tanggal / load awal), default-select
+    // semua jadwal supaya perilaku lama (izin penuh) tetap jadi default.
+    _vm.jadwalTerdampakPreview.addListener(_syncDefaultSelection);
     _vm.previewJadwalTerdampak(user: widget.user, tanggal: _tanggal);
     _vm.loadRiwayat(widget.user);
   }
 
+  void _syncDefaultSelection() {
+    final all = _vm.jadwalTerdampakPreview.value
+        .map((j) => j['_id']?.toString() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet();
+    if (!mounted) return;
+    setState(() {
+      _selectedJadwalIds
+        ..clear()
+        ..addAll(all);
+    });
+  }
+
   @override
   void dispose() {
+    _vm.jadwalTerdampakPreview.removeListener(_syncDefaultSelection);
     _vm.dispose();
     _tabCtrl.dispose();
     _keteranganCtrl.dispose();
@@ -61,11 +82,34 @@ class _IzinScreenState extends State<IzinScreen>
       ).showSnackBar(const SnackBar(content: Text('Keterangan wajib diisi.')));
       return;
     }
+
+    // Guard: harus ada jadwal di tanggal ini, dan minimal 1 dipilih.
+    final adaJadwal = _vm.jadwalTerdampakPreview.value.isNotEmpty;
+    if (!adaJadwal) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Tidak ada jadwal kuliah di tanggal ini. Izin tidak diperlukan.',
+          ),
+        ),
+      );
+      return;
+    }
+    if (_selectedJadwalIds.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Pilih minimal satu mata kuliah yang ingin diizinkan.'),
+        ),
+      );
+      return;
+    }
+
     final ok = await _vm.submitIzin(
       user: widget.user,
       tanggalIzin: _tanggal,
       jenis: _jenis,
       keterangan: _keteranganCtrl.text.trim(),
+      selectedJadwalIds: _selectedJadwalIds.toList(),
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -73,7 +117,7 @@ class _IzinScreenState extends State<IzinScreen>
         content: Text(
           ok
               ? 'Izin terkirim, menunggu approval wali.'
-              : 'Gagal mengirim izin.',
+              : (_vm.errorMessage.value ?? 'Gagal mengirim izin.'),
         ),
       ),
     );
@@ -334,7 +378,7 @@ class _IzinScreenState extends State<IzinScreen>
 
           const SizedBox(height: 24),
           _buildSectionTitle('Jadwal Berdampak'),
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
           ValueListenableBuilder<List<Map<String, dynamic>>>(
             valueListenable: _vm.jadwalTerdampakPreview,
             builder: (_, list, __) {
@@ -373,10 +417,104 @@ class _IzinScreenState extends State<IzinScreen>
                   ),
                 );
               }
+
+              final total = list.length;
+              final terpilih = _selectedJadwalIds.length;
+              final cakupanPenuh = terpilih >= total;
+
               return Column(
-                children: list
-                    .map((j) => _buildJadwalTerdampakCard(j))
-                    .toList(),
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Sub-instruksi + ringkasan cakupan + tombol pilih semua
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          'Pilih mata kuliah yang ingin diizinkan',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey.shade600,
+                            fontWeight: FontWeight.w500,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: () {
+                          setState(() {
+                            if (cakupanPenuh) {
+                              _selectedJadwalIds.clear();
+                            } else {
+                              _selectedJadwalIds
+                                ..clear()
+                                ..addAll(list
+                                    .map((j) => j['_id']?.toString() ?? '')
+                                    .where((s) => s.isNotEmpty));
+                            }
+                          });
+                        },
+                        child: Text(
+                          cakupanPenuh ? 'Hapus Semua' : 'Pilih Semua',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF1E3A8A),
+                            fontWeight: FontWeight.w700,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // Badge cakupan
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 5,
+                    ),
+                    decoration: BoxDecoration(
+                      color: cakupanPenuh
+                          ? const Color(0xFFEEF2FF)
+                          : Colors.orange.shade50,
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: cakupanPenuh
+                            ? const Color(0xFFC7D2FE)
+                            : Colors.orange.shade200,
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          cakupanPenuh
+                              ? Icons.event_busy_rounded
+                              : Icons.splitscreen_rounded,
+                          size: 14,
+                          color: cakupanPenuh
+                              ? const Color(0xFF3949AB)
+                              : Colors.orange.shade800,
+                        ),
+                        const SizedBox(width: 6),
+                        Text(
+                          cakupanPenuh
+                              ? 'Izin Penuh ($total mata kuliah)'
+                              : 'Izin Sebagian ($terpilih dari $total)',
+                          style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w700,
+                            color: cakupanPenuh
+                                ? const Color(0xFF3949AB)
+                                : Colors.orange.shade900,
+                            fontFamily: 'Plus Jakarta Sans',
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  ...list.map((j) => _buildJadwalTerdampakCard(j)),
+                ],
               );
             },
           ),
@@ -462,156 +600,263 @@ class _IzinScreenState extends State<IzinScreen>
   }
 
   Widget _buildJadwalTerdampakCard(Map<String, dynamic> j) {
+    final id = j['_id']?.toString() ?? '';
     final namaMK = j['namaMK']?.toString() ?? '-';
     final tipe = j['tipe']?.toString() ?? '';
     final jamMulai = j['jamMulai']?.toString() ?? '--:--';
     final jamSelesai = j['jamSelesai']?.toString() ?? '--:--';
     final dosen = j['namaDosen'] ?? j['kodeDosen'] ?? '-';
     final ruangan = j['ruangan']?.toString() ?? '-';
+    final selected = _selectedJadwalIds.contains(id);
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFF3F4F6)),
-        boxShadow: const [
-          BoxShadow(
-            color: Color(0x0C000000),
-            blurRadius: 2,
-            offset: Offset(0, 1),
+    return GestureDetector(
+      onTap: () {
+        setState(() {
+          if (selected) {
+            _selectedJadwalIds.remove(id);
+          } else {
+            _selectedJadwalIds.add(id);
+          }
+        });
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: selected ? Colors.white : const Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: selected
+                ? AppColors.primaryBlue.withOpacity(0.4)
+                : const Color(0xFFF3F4F6),
+            width: selected ? 1.5 : 1,
           ),
-        ],
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 48,
-            height: 48,
-            decoration: BoxDecoration(
-              color: AppColors.primaryBlue.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(12),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C000000),
+              blurRadius: 2,
+              offset: Offset(0, 1),
             ),
-            child: const Icon(
-              Icons.class_,
-              color: AppColors.primaryBlue,
-              size: 24,
+          ],
+        ),
+        child: Row(
+          children: [
+            // Checkbox indikator pilihan
+            Container(
+              width: 24,
+              height: 24,
+              decoration: BoxDecoration(
+                color: selected ? AppColors.primaryBlue : Colors.transparent,
+                borderRadius: BorderRadius.circular(7),
+                border: Border.all(
+                  color: selected
+                      ? AppColors.primaryBlue
+                      : const Color(0xFFCBD5E1),
+                  width: 2,
+                ),
+              ),
+              child: selected
+                  ? const Icon(Icons.check, color: Colors.white, size: 16)
+                  : null,
             ),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  tipe.isNotEmpty ? '$namaMK ($tipe)' : namaMK,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF1A1A1A),
-                    fontSize: 14.50,
-                    fontFamily: 'Plus Jakarta Sans',
-                    fontWeight: FontWeight.w700,
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    tipe.isNotEmpty ? '$namaMK ($tipe)' : namaMK,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      color: selected
+                          ? const Color(0xFF1A1A1A)
+                          : const Color(0xFF9CA3AF),
+                      fontSize: 14.50,
+                      fontFamily: 'Plus Jakarta Sans',
+                      fontWeight: FontWeight.w700,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.access_time,
-                      size: 13,
-                      color: Color(0xFF6B7280),
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        '$jamMulai – $jamSelesai',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 12,
-                          fontFamily: 'Plus Jakarta Sans',
-                          fontWeight: FontWeight.w500,
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 13,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          '$jamMulai – $jamSelesai',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 4),
-                      child: Text(
-                        '•',
-                        style: TextStyle(
-                          color: Color(0xFFD1D5DB),
-                          fontSize: 12,
+                      const Padding(
+                        padding: EdgeInsets.symmetric(horizontal: 4),
+                        child: Text(
+                          '•',
+                          style: TextStyle(
+                            color: Color(0xFFD1D5DB),
+                            fontSize: 12,
+                          ),
                         ),
                       ),
-                    ),
-                    const Icon(
-                      Icons.location_on,
-                      size: 13,
-                      color: Color(0xFF6B7280),
-                    ),
-                    const SizedBox(width: 4),
-                    Flexible(
-                      child: Text(
-                        ruangan,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF6B7280),
-                          fontSize: 12,
-                          fontFamily: 'Plus Jakarta Sans',
-                          fontWeight: FontWeight.w500,
+                      const Icon(
+                        Icons.location_on,
+                        size: 13,
+                        color: Color(0xFF6B7280),
+                      ),
+                      const SizedBox(width: 4),
+                      Flexible(
+                        child: Text(
+                          ruangan,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF6B7280),
+                            fontSize: 12,
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-                const SizedBox(height: 3),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.person,
-                      size: 13,
-                      color: Color(0xFF9CA3AF),
-                    ),
-                    const SizedBox(width: 4),
-                    Expanded(
-                      child: Text(
-                        dosen,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Color(0xFF9CA3AF),
-                          fontSize: 11.50,
-                          fontFamily: 'Plus Jakarta Sans',
-                          fontWeight: FontWeight.w500,
+                    ],
+                  ),
+                  const SizedBox(height: 3),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.person,
+                        size: 13,
+                        color: Color(0xFF9CA3AF),
+                      ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          dosen,
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            color: Color(0xFF9CA3AF),
+                            fontSize: 11.50,
+                            fontFamily: 'Plus Jakarta Sans',
+                            fontWeight: FontWeight.w500,
+                          ),
                         ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.red.withOpacity(0.12),
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: const Text(
-              'Absen Izin',
-              style: TextStyle(
-                color: Colors.red,
-                fontSize: 10.50,
-                fontFamily: 'Plus Jakarta Sans',
-                fontWeight: FontWeight.w700,
+                    ],
+                  ),
+                ],
               ),
             ),
+            const SizedBox(width: 8),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+              decoration: BoxDecoration(
+                color: selected
+                    ? Colors.red.withOpacity(0.12)
+                    : const Color(0xFFE5E7EB),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Text(
+                selected ? 'Diizinkan' : 'Tetap Hadir',
+                style: TextStyle(
+                  color: selected ? Colors.red : const Color(0xFF6B7280),
+                  fontSize: 10.50,
+                  fontFamily: 'Plus Jakarta Sans',
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Baris info cakupan izin (penuh / sebagian) + daftar matkul terdampak.
+  Widget _buildCakupanInfo(Map<String, dynamic> izin) {
+    final jadwalIds = (izin['jadwalIdsTerdampak'] as List?) ?? const [];
+    final tindak = (izin['tindakLanjutDosen'] as List?) ?? const [];
+    final cakupan = izin['cakupan']?.toString();
+
+    if (jadwalIds.isEmpty && tindak.isEmpty) {
+      // Dokumen lama tanpa metadata jadwal — jangan tampilkan apa-apa.
+      return const SizedBox.shrink();
+    }
+
+    // Kumpulkan nama mata kuliah unik dari tindakLanjutDosen.
+    final namaMkSet = <String>{};
+    for (final t in tindak) {
+      if (t is Map) {
+        final nm = t['namaMK']?.toString();
+        if (nm != null && nm.isNotEmpty) namaMkSet.add(nm);
+      }
+    }
+    final jumlahMk = namaMkSet.isNotEmpty ? namaMkSet.length : jadwalIds.length;
+
+    final isPenuh = cakupan == 'penuh';
+    // Kalau field cakupan tidak ada (dokumen lama), default tampil netral.
+    final labelCakupan = cakupan == null
+        ? '$jumlahMk mata kuliah'
+        : (isPenuh
+            ? 'Izin Penuh ($jumlahMk mata kuliah)'
+            : 'Izin Sebagian ($jumlahMk mata kuliah)');
+
+    final color = cakupan == null
+        ? const Color(0xFF6B7280)
+        : (isPenuh ? const Color(0xFF3949AB) : Colors.orange.shade800);
+
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                cakupan == null
+                    ? Icons.menu_book_rounded
+                    : (isPenuh
+                        ? Icons.event_busy_rounded
+                        : Icons.splitscreen_rounded),
+                size: 15,
+                color: color,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                labelCakupan,
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12.5,
+                  color: color,
+                  fontFamily: 'Plus Jakarta Sans',
+                ),
+              ),
+            ],
           ),
+          if (namaMkSet.isNotEmpty) ...[
+            const SizedBox(height: 4),
+            Padding(
+              padding: const EdgeInsets.only(left: 23),
+              child: Text(
+                namaMkSet.join(', '),
+                style: const TextStyle(
+                  fontSize: 11.5,
+                  color: Color(0xFF6B7280),
+                  fontFamily: 'Plus Jakarta Sans',
+                ),
+              ),
+            ),
+          ],
         ],
       ),
     );
@@ -901,6 +1146,7 @@ class _IzinScreenState extends State<IzinScreen>
               ),
             ],
           ),
+          _buildCakupanInfo(izin),
           const SizedBox(height: 8),
           Container(
             width: double.infinity,

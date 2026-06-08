@@ -94,13 +94,30 @@ class _FormPengajuanScreenState extends State<FormPengajuanScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
+        backgroundColor: AppColors.primaryBlue,
+        elevation: 0,
+        centerTitle: true,
+        leadingWidth: 72,
+        leading: Padding(
+          padding: const EdgeInsets.only(left: 12, top: 8, bottom: 8),
+          child: Container(
+            width: 44,
+            height: 44,
+            decoration: const BoxDecoration(
+              color: Color(0xFFFF8003),
+              shape: BoxShape.circle,
+            ),
+            child: IconButton(
+              padding: EdgeInsets.zero,
+              onPressed: () => Navigator.pop(context),
+              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+            ),
+          ),
+        ),
         title: const Text(
           'Ajukan Pergantian Jadwal',
           style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
         ),
-        backgroundColor: AppColors.primaryBlue,
-        iconTheme: const IconThemeData(color: Colors.white),
-        elevation: 0,
       ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(20),

@@ -230,6 +230,7 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
       tglStr = DateFormat('d MMM yyyy', 'id_ID').format(parsed.toUtc());
     }
     final tindakList = (izin['tindakLanjutDosen'] as List?) ?? const [];
+    final cakupan = izin['cakupan']?.toString();
 
     // Hanya tampilkan jadwal yang dosen ini yang ampu.
     final myTindak = tindakList
@@ -267,6 +268,35 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
                     ),
                   ),
                 ),
+                if (cakupan == 'sebagian') ...[
+                  const SizedBox(width: 6),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 3,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.splitscreen_rounded,
+                            size: 11, color: Colors.orange[800]),
+                        const SizedBox(width: 3),
+                        Text(
+                          'SEBAGIAN',
+                          style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w700,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
                 const Spacer(),
                 Text(
                   tglStr,
@@ -297,9 +327,11 @@ class _ApprovalScreenState extends State<ApprovalScreen> {
               overflow: TextOverflow.ellipsis,
             ),
             const Divider(height: 24),
-            const Text(
-              'Jadwal yang Anda ampu:',
-              style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+            Text(
+              cakupan == 'sebagian'
+                  ? 'Jadwal yang Anda ampu (izin sebagian — mahasiswa tetap masuk kelas lain):'
+                  : 'Jadwal yang Anda ampu:',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
             ),
             const SizedBox(height: 8),
             ...myTindak.map((t) => _tindakTile(izin, t)),

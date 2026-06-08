@@ -1,11 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'firebase_options.dart';
 import 'core/theme/app_theme.dart';
 import 'features/auth/viewmodel/auth_viewmodel.dart';
 import 'features/auth/view/login_screen.dart';
 import 'features/mahasiswa/dashboard/view/mahasiswa_dashboard_screen.dart';
 import 'features/mahasiswa/izin/view/izin_screen.dart';
 import 'features/dosen/dashboard/view/dosen_dashboard_screen.dart';
-import 'features/dosen/tindak_lanjut_izin/view/tindak_lanjut_screen.dart';
+import 'features/dosen/izin/view/tindak_lanjut_izin_screen.dart';
 import 'features/admin/dashboard/view/admin_dashboard_screen.dart';
 import 'features/admin/upload_jadwal/view/upload_jadwal_screen.dart';
 import 'features/admin/manajemen_periode/view/manajemen_periode_screen.dart';
@@ -22,9 +24,13 @@ import 'core/services/connectivity_service.dart';
 import 'core/services/sync_manager.dart';
 import 'core/services/notification_service.dart';
 import 'package:timezone/data/latest.dart' as tz;
+import 'package:timezone/timezone.dart' as tz;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  );
   await dotenv.load(fileName: '.env');
   await HiveHelper.init();
   await initializeDateFormatting('id_ID', null);
@@ -38,6 +44,8 @@ Future<void> main() async {
 
   // Inisialisasi notifikasi & timezone
   tz.initializeTimeZones();
+  final jakarta = tz.getLocation('Asia/Jakarta');
+  tz.setLocalLocation(jakarta);
   await NotificationService().init();
 
   final authViewModel = AuthViewModel();
@@ -189,7 +197,7 @@ class _SmartAttendAppState extends State<SmartAttendApp> {
             final user = _authViewModel.currentUser.value;
             if (user == null) return _redirectToLogin();
             return MaterialPageRoute(
-              builder: (_) => TindakLanjutIzinScreen(user: user),
+              builder: (_) => const TindakLanjutIzinScreen(),
             );
 
           case '/admin/upload-jadwal':

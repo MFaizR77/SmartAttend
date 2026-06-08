@@ -104,6 +104,9 @@ class DatabaseService {
     return _db!;
   }
 
+  /// Public getter untuk test dan cleanup. JANGAN pakai di production code.
+  Db get db => _requireDb;
+
   /// Mutex serial untuk operasi DB. mongo_dart tidak aman dipakai paralel dari
   /// banyak Future di koneksi yang sama (apalagi saat retry — reconnect
   /// menutup socket di tengah query lain → query yg lain hang/timeout).
@@ -2314,6 +2317,59 @@ class DatabaseService {
         return (a['kelas'] as String).compareTo(b['kelas'] as String);
       });
       return list;
+    });
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // STUB METHODS: FCM & Notifications (belum fully implemented)
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /// Save FCM token for a user (stub).
+  Future<void> saveFcmToken({
+    required String userId,
+    required String accountType,
+    required String token,
+  }) async {
+    // TODO: implement FCM token storage
+  }
+
+  /// Get FCM tokens for users enrolled in a jadwal (stub).
+  Future<List<String>> getFcmTokensByJadwal(String jadwalId) async {
+    return [];
+  }
+
+  /// Get FCM tokens by user IDs (stub).
+  Future<List<String>> getFcmTokensByUserIds(List<String> userIds) async {
+    return [];
+  }
+
+  /// Get jadwal info by ID.
+  Future<Map<String, dynamic>?> getJadwalInfo(String jadwalId) async {
+    return _withReconnect(() async {
+      return await _requireDb
+          .collection('jadwal_kuliah')
+          .findOne(where.eq('_id', jadwalId));
+    });
+  }
+
+  /// Get wali dosen ID by kelas dan program.
+  Future<String?> getWalidosenIdByKelas(String kelas, String program) async {
+    return _withReconnect(() async {
+      final wali = await _requireDb.collection('wali_dosen').findOne({
+        'kelasWali': kelas,
+        'program': program,
+      });
+      return wali?['_id']?.toString();
+    });
+  }
+
+  /// Get izin by ID.
+  Future<Map<String, dynamic>?> getIzinById(dynamic izinId) async {
+    return _withReconnect(() async {
+      final id = izinId is ObjectId
+          ? izinId
+          : ObjectId.fromHexString(izinId.toString());
+      return await _requireDb.collection('izin_mahasiswa').findOne(where.id(id));
     });
   }
 

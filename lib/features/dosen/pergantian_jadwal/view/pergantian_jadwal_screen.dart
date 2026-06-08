@@ -58,20 +58,62 @@ class _PergantianJadwalScreenState extends State<PergantianJadwalScreen>
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('Pergantian Jadwal',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-        backgroundColor: AppColors.primary,
-        iconTheme: const IconThemeData(color: Colors.white),
+        backgroundColor: const Color(0xFF01018B),
         elevation: 0,
-        actions: [
-          TextButton.icon(
-            onPressed: () => setState(() => _showRiwayat = !_showRiwayat),
-            icon: Icon(_showRiwayat ? Icons.calendar_today : Icons.history,
-                color: Colors.white, size: 18),
-            label: Text(_showRiwayat ? 'Jadwal' : 'Riwayat',
-                style: const TextStyle(color: Colors.white)),
+        toolbarHeight: 86,
+        automaticallyImplyLeading: false,
+        flexibleSpace: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+            child: Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF8003),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 20),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Center(
+                    child: Text('Pergantian Jadwal',
+                        style: TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 18)),
+                  ),
+                ),
+                GestureDetector(
+                  onTap: () => setState(() => _showRiwayat = !_showRiwayat),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(22),
+                      border: Border.all(color: Colors.white.withOpacity(0.18)),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(_showRiwayat ? Icons.calendar_today : Icons.history,
+                            color: Colors.white, size: 14),
+                        const SizedBox(width: 8),
+                        Text(_showRiwayat ? 'Jadwal' : 'Riwayat',
+                            style: const TextStyle(color: Colors.white)),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
       body: _showRiwayat ? _buildRiwayat() : _buildJadwalView(),
     );
@@ -94,18 +136,25 @@ class _PergantianJadwalScreenState extends State<PergantianJadwalScreen>
                     onTap: () => setState(() => _selectedTabIndex = index),
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      padding: const EdgeInsets.symmetric(vertical: 8),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.transparent,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: isSelected ? AppColors.primary : AppColors.border),
+                        color: isSelected ? const Color(0xFF01018B) : Colors.white,
+                        borderRadius: BorderRadius.circular(18),
+                        boxShadow: isSelected
+                            ? [
+                                BoxShadow(
+                                  color: const Color(0xFF01018B).withOpacity(0.18),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 4),
+                                )
+                              ]
+                            : null,
                       ),
                       child: Text(
-                        _hariList[index].substring(0, 3), // Sen, Sel, Rab, Kam, Jum
+                        _hariList[index].substring(0, 3),
                         textAlign: TextAlign.center,
                         style: TextStyle(
-                          color: isSelected ? Colors.white : AppColors.textSecondary,
+                          color: isSelected ? Colors.white : const Color(0xFF9CA3AF),
                           fontWeight: FontWeight.bold,
                           fontSize: 13,
                         ),
@@ -153,79 +202,81 @@ class _PergantianJadwalScreenState extends State<PergantianJadwalScreen>
       itemCount: jadwalHari.length,
       itemBuilder: (context, index) {
         final j = jadwalHari[index];
-        return _buildJadwalCard(j);
+        return _buildJadwalCardRefined(j);
       },
     );
   }
-
-  Widget _buildJadwalCard(Map<String, dynamic> j) {
-    return Card(
+  Widget _buildJadwalCardRefined(Map<String, dynamic> j) {
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      elevation: 0,
-      shape: RoundedRectangleBorder(
+      decoration: BoxDecoration(
+        color: const Color(0xFFF6F6F8),
         borderRadius: BorderRadius.circular(14),
-        side: const BorderSide(color: AppColors.border),
+        border: Border.all(color: const Color(0xFF1A1A1A), width: 2),
+        boxShadow: const [
+          BoxShadow(color: Color(0x11000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
       ),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(14),
-        onTap: () async {
-          final result = await Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => FormPengajuanScreen(
-                user: widget.user,
-                vm: _vm,
-                jadwalTerpilih: j,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(14),
+          onTap: () async {
+            final result = await Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (_) => FormPengajuanScreen(
+                  user: widget.user,
+                  vm: _vm,
+                  jadwalTerpilih: j,
+                ),
               ),
+            );
+            if (result == true) {
+              _vm.loadRiwayat(widget.user.id);
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  width: 52,
+                  height: 52,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF0F2FF),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(Icons.menu_book, color: Color(0xFF2E2BF6), size: 26),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        j['namaMK'] ?? '-',
+                        style: const TextStyle(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                            color: Color(0xFF1A1A1A)),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        'Kelas ${j['kelas'] ?? '-'}  •  ${j['jamMulai'] ?? ''} - ${j['jamSelesai'] ?? ''}',
+                        style: const TextStyle(color: Color(0xFF6B7280), fontSize: 13),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        'Ruang: ${j['ruangan'] ?? '-'}',
+                        style: const TextStyle(color: Color(0xFF9CA3AF), fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                const Icon(Icons.chevron_right_rounded, color: Color(0xFF9CA3AF)),
+              ],
             ),
-          );
-          if (result == true) {
-            _vm.loadRiwayat(widget.user.id);
-          }
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: AppColors.primary.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Icon(Icons.class_outlined,
-                    color: AppColors.primary, size: 24),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      j['namaMK'] ?? '-',
-                      style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: AppColors.primary),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      'Kelas ${j['kelas'] ?? '-'}  •  ${j['jamMulai'] ?? ''} - ${j['jamSelesai'] ?? ''}',
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                    Text(
-                      'Ruang: ${j['ruangan'] ?? '-'}',
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 13),
-                    ),
-                  ],
-                ),
-              ),
-              const Icon(Icons.chevron_right_rounded,
-                  color: AppColors.primary),
-            ],
           ),
         ),
       ),
