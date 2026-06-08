@@ -389,9 +389,6 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
         ? (_vm.daftarRekap.first['totalPertemuan'] as int? ?? 0)
         : 0;
     final jumlahMhs = _vm.daftarRekap.length;
-    final avgPersen = jumlahMhs > 0
-        ? _vm.daftarRekap.fold<double>(0, (s, r) => s + (r['persenHadir'] as double? ?? 0.0)) / jumlahMhs
-        : 0.0;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
@@ -424,111 +421,128 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
                   _statPill('Izin', totalIzin.toString(), const Color(0xFF0F766E)),
                   const SizedBox(width: 8),
                   _statPill('Alpha', totalAlpha.toString(), const Color(0xFFDC2626)),
-                  const SizedBox(width: 8),
-                  _statPill('Avg %', '${avgPersen.toStringAsFixed(1)}%', const Color(0xFFB45309)),
                 ]),
               ],
             ),
           ),
         ),
 
-        // ── Table Header ─────────────────────────────────────────────────────
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            color: AppColors.surfaceVariant,
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: AppColors.border),
-          ),
-          child: const Row(
-            children: [
-              Expanded(
-                flex: 4,
-                child: Text('Mahasiswa', style: TextStyle(fontWeight: FontWeight.w800, fontSize: 13)),
-              ),
-              SizedBox(
-                width: 40,
-                child: Text('Hadir', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.graySlate), textAlign: TextAlign.center),
-              ),
-              SizedBox(
-                width: 36,
-                child: Text('Izin', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.graySlate), textAlign: TextAlign.center),
-              ),
-              SizedBox(
-                width: 44,
-                child: Text('Alpha', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.graySlate), textAlign: TextAlign.center),
-              ),
-              SizedBox(
-                width: 50,
-                child: Text('%Hadir', style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: AppColors.graySlate), textAlign: TextAlign.center),
-              ),
+        // ── Hint ─────────────────────────────────────────────────────────────
+        Padding(
+          padding: const EdgeInsets.only(left: 4, bottom: 8),
+          child: Row(
+            children: const [
+              Icon(Icons.touch_app_rounded, size: 14, color: AppColors.graySlate),
+              SizedBox(width: 6),
+              Text('Ketuk mahasiswa untuk melihat tanggal kehadiran',
+                  style: TextStyle(fontSize: 12, color: AppColors.graySlate)),
             ],
           ),
         ),
-        const SizedBox(height: 6),
 
-        // ── Rows ─────────────────────────────────────────────────────────────
+        // ── Rows (expandable) ─────────────────────────────────────────────────
         ..._vm.daftarRekap.map((r) {
           final hadir = r['hadir'] as int? ?? 0;
           final izin = r['izin'] as int? ?? 0;
           final alpha = r['alpha'] as int? ?? 0;
-          final persen = r['persenHadir'] as double? ?? 0.0;
-          final persenColor = persen >= 75
-              ? AppColors.primaryBlue
-              : persen >= 50
-                  ? const Color(0xFFB45309)
-                  : const Color(0xFFDC2626);
+          final tanggalHadir = (r['tanggalHadir'] as List?)?.cast<String>() ?? [];
+          final tanggalIzin = (r['tanggalIzin'] as List?)?.cast<String>() ?? [];
+          final tanggalAlpha = (r['tanggalAlpha'] as List?)?.cast<String>() ?? [];
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 6),
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
               decoration: BoxDecoration(
                 color: AppColors.surface,
                 borderRadius: BorderRadius.circular(10),
                 border: Border.all(color: AppColors.border),
               ),
-              child: Row(
-                children: [
-                  Expanded(
-                    flex: 4,
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          r['nama']?.toString() ?? '-',
-                          style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        Text(
-                          r['nim']?.toString() ?? '-',
-                          style: const TextStyle(fontSize: 11, color: AppColors.graySlate),
-                        ),
-                      ],
-                    ),
+              clipBehavior: Clip.antiAlias,
+              child: Theme(
+                data: Theme.of(context).copyWith(dividerColor: Colors.transparent),
+                child: ExpansionTile(
+                  key: PageStorageKey(r['nim']?.toString() ?? r['mahasiswaId']?.toString()),
+                  tilePadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 2),
+                  childrenPadding: const EdgeInsets.fromLTRB(14, 0, 14, 12),
+                  title: Text(
+                    r['nama']?.toString() ?? '-',
+                    style: const TextStyle(fontWeight: FontWeight.w700, fontSize: 13),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  SizedBox(
-                    width: 40,
-                    child: Text('$hadir', textAlign: TextAlign.center, style: const TextStyle(fontWeight: FontWeight.w700)),
+                  subtitle: Text(
+                    r['nim']?.toString() ?? '-',
+                    style: const TextStyle(fontSize: 11, color: AppColors.graySlate),
                   ),
-                  SizedBox(
-                    width: 36,
-                    child: Text('$izin', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFF0F766E), fontWeight: FontWeight.w600)),
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      _countBadge('$hadir', AppColors.primaryBlue),
+                      const SizedBox(width: 6),
+                      _countBadge('$izin', const Color(0xFF0F766E)),
+                      const SizedBox(width: 6),
+                      _countBadge('$alpha', const Color(0xFFDC2626)),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.expand_more_rounded, size: 18, color: AppColors.graySlate),
+                    ],
                   ),
-                  SizedBox(
-                    width: 44,
-                    child: Text('$alpha', textAlign: TextAlign.center, style: const TextStyle(color: Color(0xFFDC2626), fontWeight: FontWeight.w600)),
-                  ),
-                  SizedBox(
-                    width: 50,
-                    child: Text('${persen.toStringAsFixed(1)}%', textAlign: TextAlign.center, style: TextStyle(color: persenColor, fontWeight: FontWeight.w700, fontSize: 12)),
-                  ),
-                ],
+                  children: [
+                    _tanggalSection('Hadir', tanggalHadir, AppColors.primaryBlue),
+                    _tanggalSection('Izin / Sakit', tanggalIzin, const Color(0xFF0F766E)),
+                    _tanggalSection('Alpha', tanggalAlpha, const Color(0xFFDC2626)),
+                  ],
+                ),
               ),
             ),
           );
         }),
       ],
+    );
+  }
+
+  Widget _countBadge(String value, Color color) {
+    return Container(
+      width: 30,
+      height: 24,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(8),
+      ),
+      child: Text(value, style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: color)),
+    );
+  }
+
+  Widget _tanggalSection(String label, List<String> tanggal, Color color) {
+    return Padding(
+      padding: const EdgeInsets.only(top: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(width: 8, height: 8, decoration: BoxDecoration(color: color, shape: BoxShape.circle)),
+              const SizedBox(width: 6),
+              Text('$label (${tanggal.length})',
+                  style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800, color: AppColors.textPrimary)),
+            ],
+          ),
+          const SizedBox(height: 6),
+          if (tanggal.isEmpty)
+            const Padding(
+              padding: EdgeInsets.only(left: 14),
+              child: Text('—', style: TextStyle(fontSize: 12, color: AppColors.grayLight)),
+            )
+          else
+            Padding(
+              padding: const EdgeInsets.only(left: 14),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: tanggal.map((t) => _tanggalChip(_formatTanggal(t), color)).toList(),
+              ),
+            ),
+        ],
+      ),
     );
   }
 
@@ -587,7 +601,11 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
           final berhalangan = d['berhalangan'] as int? ?? 0;
           final totalPertemuan = d['totalPertemuan'] as int? ?? 0;
           final persen = d['persenHadir'] as double? ?? 0.0;
-          final alasanList = (d['alasan'] as List?)?.cast<String>() ?? [];
+          final tanggalHadir = (d['tanggalHadir'] as List?)?.cast<String>() ?? [];
+          final berhalanganDetail = (d['berhalanganDetail'] as List?)
+                  ?.map((e) => Map<String, dynamic>.from(e as Map))
+                  .toList() ??
+              [];
           final persenColor = persen >= 75
               ? AppColors.primaryBlue
               : persen >= 50
@@ -635,21 +653,54 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
                       _miniStat('Total Pertemuan', '$totalPertemuan', AppColors.graySlate),
                     ],
                   ),
-                  if (alasanList.isNotEmpty) ...[
-                    const SizedBox(height: 10),
-                    const Text('Keterangan Izin:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
-                    const SizedBox(height: 4),
-                    ...alasanList.map((a) => Padding(
-                          padding: const EdgeInsets.only(bottom: 4),
-                          child: Row(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Icon(Icons.info_outline, size: 14, color: AppColors.graySlate),
-                              const SizedBox(width: 6),
-                              Expanded(child: Text(a, style: const TextStyle(fontSize: 12, color: AppColors.graySlate))),
-                            ],
-                          ),
-                        )),
+                  if (tanggalHadir.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Icon(Icons.event_available_rounded, size: 15, color: AppColors.primaryBlue),
+                        SizedBox(width: 6),
+                        Text('Tanggal Hadir', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    Wrap(
+                      spacing: 6,
+                      runSpacing: 6,
+                      children: tanggalHadir
+                          .map((t) => _tanggalChip(_formatTanggal(t), AppColors.primaryBlue))
+                          .toList(),
+                    ),
+                  ],
+                  if (berhalanganDetail.isNotEmpty) ...[
+                    const SizedBox(height: 12),
+                    Row(
+                      children: const [
+                        Icon(Icons.event_busy_rounded, size: 15, color: Color(0xFFB45309)),
+                        SizedBox(width: 6),
+                        Text('Tanggal Berhalangan', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w800)),
+                      ],
+                    ),
+                    const SizedBox(height: 6),
+                    ...berhalanganDetail.map((b) {
+                      final tgl = b['tanggal']?.toString() ?? '';
+                      final alasan = b['alasan']?.toString() ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.only(bottom: 6),
+                        child: Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            _tanggalChip(_formatTanggal(tgl), const Color(0xFFB45309)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                alasan.isEmpty ? 'Tanpa keterangan' : alasan,
+                                style: const TextStyle(fontSize: 12, color: AppColors.graySlate),
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ],
               ),
@@ -657,6 +708,31 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
           );
         }),
       ],
+    );
+  }
+
+  String _formatTanggal(String ymd) {
+    final dt = DateTime.tryParse(ymd);
+    if (dt == null) return ymd;
+    const bulan = [
+      '', 'Jan', 'Feb', 'Mar', 'Apr', 'Mei', 'Jun',
+      'Jul', 'Agu', 'Sep', 'Okt', 'Nov', 'Des',
+    ];
+    return '${dt.day.toString().padLeft(2, '0')} ${bulan[dt.month]} ${dt.year}';
+  }
+
+  Widget _tanggalChip(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.10),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: color.withValues(alpha: 0.35)),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(fontSize: 11, fontWeight: FontWeight.w700, color: color),
+      ),
     );
   }
 
@@ -679,46 +755,6 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
       ),
     );
   }
-
-  Widget _buildTableHeader({
-    required String leftTitle,
-    required String leftSubtitle,
-    required List<String> rightTitles,
-  }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.surface,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(leftTitle, style: const TextStyle(fontWeight: FontWeight.w800, fontSize: 14)),
-                const SizedBox(height: 2),
-                Text(leftSubtitle, style: const TextStyle(fontSize: 12, color: AppColors.graySlate)),
-              ],
-            ),
-          ),
-          ...rightTitles.map(
-            (title) => Padding(
-              padding: const EdgeInsets.only(left: 12),
-              child: Text(
-                title,
-                style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppColors.graySlate),
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatNumber(int v) => v.toString();
 
   Widget _statPill(String label, String value, Color color) {
     return Expanded(

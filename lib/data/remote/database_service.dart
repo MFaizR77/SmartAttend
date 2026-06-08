@@ -1542,13 +1542,18 @@ class DatabaseService {
         // Alpha: pertemuan yg terjadi (ada di laporan_dosen) tapi mahasiswa
         // tidak hadir dan tidak izin.
         int alpha = 0;
+        final tanggalAlpha = <String>[];
         if (totalPertemuan > 0) {
           for (final day in pertemuanDays) {
             final adaHadir = hadirDays.contains(day);
             final adaIzin = izinDays.contains(day);
-            if (!adaHadir && !adaIzin) alpha++;
+            if (!adaHadir && !adaIzin) {
+              alpha++;
+              tanggalAlpha.add(day);
+            }
           }
         }
+        tanggalAlpha.sort();
 
         final mhs = mhsMap[mahasiswaId];
         final persenHadir = totalPertemuan > 0
@@ -1564,6 +1569,10 @@ class DatabaseService {
           'alpha': alpha,
           'totalPertemuan': totalPertemuan,
           'persenHadir': persenHadir,
+          // tanggal-tanggal spesifik (urut)
+          'tanggalHadir': hadirDays.toList()..sort(),
+          'tanggalIzin': izinDays.toList()..sort(),
+          'tanggalAlpha': tanggalAlpha,
         });
 
         if (result.length <= 3) {
@@ -1695,6 +1704,13 @@ class DatabaseService {
             ? double.parse(((hadir / totalPertemuan) * 100).toStringAsFixed(1))
             : 0.0;
 
+        // Daftar tanggal (urut) untuk ditampilkan di UI.
+        final tanggalHadir = hadirDays.toList()..sort();
+        final tanggalBerhalangan = berhalanganDays.toList()..sort();
+        final berhalanganDetail = tanggalBerhalangan
+            .map((t) => {'tanggal': t, 'alasan': alasanPerTanggal[t] ?? ''})
+            .toList();
+
         final dosen = dosenMap[dsnId];
         result.add({
           'dosenId': dsnId,
@@ -1704,6 +1720,10 @@ class DatabaseService {
           'totalPertemuan': totalPertemuan,
           'persenHadir': persenHadir,
           'alasan': alasanList,
+          // tanggal-tanggal spesifik
+          'tanggalHadir': tanggalHadir,
+          'tanggalBerhalangan': tanggalBerhalangan,
+          'berhalanganDetail': berhalanganDetail,
         });
         print('[DBG] dosen=$dsnId -> hadir=$hadir, berhalangan=$berhalangan, total=$totalPertemuan');
       }
