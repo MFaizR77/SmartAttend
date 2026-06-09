@@ -77,6 +77,7 @@ class SesiAbsensi extends HiveObject {
           ? DateTime.parse(map['tanggal']) 
           : DateTime.now(),
       status: map['status'] ?? 'closed',
+      dibukaOleh: map['dibukaOleh'],
       openedAt: map['openedAt'] != null 
           ? DateTime.parse(map['openedAt']) 
           : null,

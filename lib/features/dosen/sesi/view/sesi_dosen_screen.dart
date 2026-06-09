@@ -20,10 +20,8 @@ class SesiDosenScreen extends StatefulWidget {
 class _SesiDosenScreenState extends State<SesiDosenScreen> {
   late SesiDosenViewModel _vm;
 
-  // State untuk seleksi bulk
-  final Set<String> _selectedNims = {};
-  bool _isSelectionMode = false;
-  bool _isBulkLoading = false;
+  // Loading state untuk tandai semua hadir
+  bool _isTandaiSemuaLoading = false;
 
   @override
   void initState() {
@@ -102,9 +100,49 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                     children: [
                       Text(widget.jadwal['mataKuliah'] ?? '-', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('Ruang: ${widget.jadwal["ruang"]}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      Row(
+                        children: [
+                          Icon(Icons.room_rounded, size: 14, color: AppColors.textSecondary),
+                          const SizedBox(width: 4),
+                          Text('Ruang: ${widget.jadwal["ruang"]}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        ],
+                      ),
                     ],
                   ),
+                ),
+                // Chip Kehadiran Semester Dosen
+                ValueListenableBuilder<int>(
+                  valueListenable: _vm.kehadiranHadir,
+                  builder: (context, hadir, child) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: _vm.kehadiranTotal,
+                      builder: (context, total, child) {
+                        if (total == 0) return const SizedBox.shrink(); // Hide if data not loaded
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Hadir Semester',
+                                style: TextStyle(fontSize: 10, color: AppColors.primaryBlue.withOpacity(0.8), fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$hadir / $total',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primaryBlue),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),
@@ -323,165 +361,173 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
             final izinCount  = list.where((m) => m['status'] == 'izin').length;
             final sakitCount = list.where((m) => m['status'] == 'sakit').length;
 
-            final allNims = list.map((m) => m['nim'] as String? ?? '').where((n) => n.isNotEmpty).toList();
-            final allSelected = allNims.isNotEmpty && _selectedNims.containsAll(allNims);
+            // Mahasiswa yang statusnya belum/alpha (layak ditandai hadir)
+            final nimsBelumHadir = list
+                .where((m) => m['status'] == 'belum' || m['status'] == 'alpha')
+                .map((m) => m['nim'] as String? ?? '')
+                .where((n) => n.isNotEmpty)
+                .toList();
+            final semuaSudahHadir = nimsBelumHadir.isEmpty && list.isNotEmpty;
 
-            return Column(
-              children: [
-                Card(
-                  elevation: 0,
-                  color: Colors.white,
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(16),
-                    side: const BorderSide(color: AppColors.border),
-                  ),
-                  child: Padding(
-                    padding: const EdgeInsets.all(16),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+            return Card(
+              elevation: 0,
+              color: Colors.white,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+                side: const BorderSide(color: AppColors.border),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
                       children: [
-                        // Header
-                        Row(
-                          children: [
-                            const Icon(Icons.people_outline, color: AppColors.primary, size: 20),
-                            const SizedBox(width: 8),
-                            const Expanded(
-                              child: Text('Kehadiran Mahasiswa',
-                                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
-                            ),
-                            // Tombol mode seleksi
-                            InkWell(
-                              onTap: () {
-                                setState(() {
-                                  _isSelectionMode = !_isSelectionMode;
-                                  if (!_isSelectionMode) _selectedNims.clear();
-                                });
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Padding(
-                                padding: const EdgeInsets.all(4),
-                                child: Icon(
-                                  _isSelectionMode ? Icons.close_rounded : Icons.checklist_rounded,
-                                  color: _isSelectionMode ? AppColors.error : AppColors.textSecondary,
-                                  size: 20,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 4),
-                            InkWell(
-                              onTap: () => _vm.loadStatusMahasiswa(),
-                              borderRadius: BorderRadius.circular(8),
-                              child: const Padding(
-                                padding: EdgeInsets.all(4),
-                                child: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
-                              ),
-                            ),
-                          ],
+                        const Icon(Icons.people_outline, color: AppColors.primary, size: 20),
+                        const SizedBox(width: 8),
+                        const Expanded(
+                          child: Text('Kehadiran Mahasiswa',
+                              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
                         ),
-                        const SizedBox(height: 12),
-
-                        // Summary chips
-                        if (list.isNotEmpty)
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: [
-                                _summaryChip('Hadir', hadirCount, AppColors.success),
-                                const SizedBox(width: 8),
-                                _summaryChip('Belum', belumCount, Colors.grey),
-                                const SizedBox(width: 8),
-                                _summaryChip('Izin', izinCount, Colors.blue),
-                                const SizedBox(width: 8),
-                                _summaryChip('Sakit', sakitCount, Colors.orange),
-                                const SizedBox(width: 8),
-                                _summaryChip('Alpha', alphaCount, AppColors.error),
-                              ],
-                            ),
+                        InkWell(
+                          onTap: () => _vm.loadStatusMahasiswa(),
+                          borderRadius: BorderRadius.circular(8),
+                          child: const Padding(
+                            padding: EdgeInsets.all(4),
+                            child: Icon(Icons.refresh_rounded, color: AppColors.textSecondary, size: 20),
                           ),
-
-                        // Select All row (hanya saat mode seleksi)
-                        if (_isSelectionMode && list.isNotEmpty) ...[
-                          const SizedBox(height: 10),
-                          GestureDetector(
-                            onTap: () {
-                              setState(() {
-                                if (allSelected) {
-                                  _selectedNims.clear();
-                                } else {
-                                  _selectedNims.addAll(allNims);
-                                }
-                              });
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: allSelected
-                                    ? AppColors.primaryBlue.withOpacity(0.08)
-                                    : AppColors.surface,
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(
-                                  color: allSelected
-                                      ? AppColors.primaryBlue.withOpacity(0.4)
-                                      : AppColors.border,
-                                ),
-                              ),
-                              child: Row(
-                                children: [
-                                  Icon(
-                                    allSelected
-                                        ? Icons.check_box_rounded
-                                        : Icons.check_box_outline_blank_rounded,
-                                    color: allSelected
-                                        ? AppColors.primaryBlue
-                                        : AppColors.textSecondary,
-                                    size: 20,
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Text(
-                                    allSelected
-                                        ? 'Batalkan Semua (${allNims.length})'
-                                        : 'Pilih Semua Mahasiswa (${allNims.length})',
-                                    style: TextStyle(
-                                      color: allSelected
-                                          ? AppColors.primaryBlue
-                                          : AppColors.textSecondary,
-                                      fontWeight: FontWeight.w600,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-
-                        const SizedBox(height: 12),
-
-                        // Daftar mahasiswa
-                        if (list.isEmpty)
-                          const Padding(
-                            padding: EdgeInsets.symmetric(vertical: 16),
-                            child: Center(
-                              child: Text('Memuat data mahasiswa...',
-                                  style: TextStyle(color: AppColors.textSecondary)),
-                            ),
-                          )
-                        else
-                          ...list.map((m) => _buildMahasiswaRow(m)),
+                        ),
                       ],
                     ),
-                  ),
-                ),
+                    const SizedBox(height: 12),
 
-                // Bulk action bar (muncul saat ada mahasiswa dipilih)
-                if (_isSelectionMode && _selectedNims.isNotEmpty)
-                  _buildBulkActionBar(),
-              ],
+                    // Summary chips
+                    if (list.isNotEmpty)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            _summaryChip('Hadir', hadirCount, AppColors.success),
+                            const SizedBox(width: 8),
+                            _summaryChip('Belum', belumCount, Colors.grey),
+                            const SizedBox(width: 8),
+                            _summaryChip('Izin', izinCount, Colors.blue),
+                            const SizedBox(width: 8),
+                            _summaryChip('Sakit', sakitCount, Colors.orange),
+                            const SizedBox(width: 8),
+                            _summaryChip('Alpha', alphaCount, AppColors.error),
+                          ],
+                        ),
+                      ),
+
+                    // Tombol Tandai Semua Hadir
+                    if (list.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      semuaSudahHadir
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                                  SizedBox(width: 6),
+                                  Text('Semua mahasiswa sudah hadir',
+                                      style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600, fontSize: 13)),
+                                ],
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: _isTandaiSemuaLoading ? null : () => _tandaiSemuaHadir(nimsBelumHadir),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryBlue.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.35)),
+                                ),
+                                child: _isTandaiSemuaLoading
+                                    ? const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 14, height: 14,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('Menandai semua hadir...',
+                                              style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w600, fontSize: 13)),
+                                        ],
+                                      )
+                                    : Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.done_all_rounded, color: AppColors.primaryBlue, size: 16),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Tandai Semua Hadir (${nimsBelumHadir.length})',
+                                            style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w700, fontSize: 13),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                    ],
+
+                    const SizedBox(height: 12),
+
+                    // Daftar mahasiswa
+                    if (list.isEmpty)
+                      const Padding(
+                        padding: EdgeInsets.symmetric(vertical: 16),
+                        child: Center(
+                          child: Text('Memuat data mahasiswa...',
+                              style: TextStyle(color: AppColors.textSecondary)),
+                        ),
+                      )
+                    else
+                      ...list.map((m) => _buildMahasiswaRow(m)),
+                  ],
+                ),
+              ),
             );
           },
         );
       },
     );
+  }
+
+  Future<void> _tandaiSemuaHadir(List<String> nims) async {
+    if (nims.isEmpty) return;
+    setState(() => _isTandaiSemuaLoading = true);
+    try {
+      await _vm.tandaiStatusBulk(nims, 'hadir');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${nims.length} mahasiswa ditandai Hadir'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal menandai hadir, coba lagi'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isTandaiSemuaLoading = false);
+    }
   }
 
   Widget _summaryChip(String label, int count, Color color) {
@@ -499,132 +545,10 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
     );
   }
 
-  Widget _buildBulkActionBar() {
-    return Container(
-      margin: const EdgeInsets.only(top: 12),
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: AppColors.primaryBlue,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.primaryBlue.withOpacity(0.3),
-            blurRadius: 12,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            '${_selectedNims.length} mahasiswa dipilih',
-            style: const TextStyle(
-              color: Colors.white70,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-          const SizedBox(height: 10),
-          if (_isBulkLoading)
-            const Center(
-              child: SizedBox(
-                height: 24,
-                width: 24,
-                child: CircularProgressIndicator(
-                  strokeWidth: 2.5,
-                  color: Colors.white,
-                ),
-              ),
-            )
-          else
-            Row(
-              children: [
-                _bulkBtn('Hadir', Icons.check_circle_rounded, AppColors.success, 'hadir'),
-                const SizedBox(width: 8),
-                _bulkBtn('Izin', Icons.event_note_rounded, Colors.blue.shade300, 'izin'),
-                const SizedBox(width: 8),
-                _bulkBtn('Sakit', Icons.sick_rounded, Colors.orange, 'sakit'),
-                const SizedBox(width: 8),
-                _bulkBtn('Alpha', Icons.cancel_rounded, AppColors.error, 'alpha'),
-              ],
-            ),
-        ],
-      ),
-    );
-  }
-
-  Widget _bulkBtn(String label, IconData icon, Color color, String status) {
-    return Expanded(
-      child: GestureDetector(
-        onTap: () => _doBulkAction(status),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.15),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(color: color.withOpacity(0.6)),
-          ),
-          child: Column(
-            children: [
-              Icon(icon, color: color, size: 18),
-              const SizedBox(height: 3),
-              Text(
-                label,
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  Future<void> _doBulkAction(String status) async {
-    final nimList = _selectedNims.toList();
-    setState(() => _isBulkLoading = true);
-    try {
-      await _vm.tandaiStatusBulk(nimList, status);
-      if (mounted) {
-        setState(() {
-          _selectedNims.clear();
-          _isSelectionMode = false;
-          _isBulkLoading = false;
-        });
-        final label = {'hadir': 'Hadir', 'izin': 'Izin', 'sakit': 'Sakit', 'alpha': 'Alpha'}[status] ?? status;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text('${nimList.length} mahasiswa → $label'),
-          backgroundColor: {
-            'hadir': AppColors.success,
-            'izin': Colors.blue,
-            'sakit': Colors.orange,
-            'alpha': AppColors.error,
-          }[status] ?? Colors.grey,
-          behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          margin: const EdgeInsets.all(16),
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isBulkLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('Gagal mengubah status, coba lagi'),
-          backgroundColor: AppColors.error,
-        ));
-      }
-    }
-  }
-
   Widget _buildMahasiswaRow(Map<String, dynamic> m) {
     final status = m['status'] as String? ?? 'belum';
     final nama = m['nama'] as String? ?? '-';
     final nim = m['nim'] as String? ?? '-';
-    final isSelected = _selectedNims.contains(nim);
 
     Color chipColor;
     String chipLabel;
@@ -656,133 +580,65 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
         chipIcon = Icons.access_time_rounded;
     }
 
-    return GestureDetector(
-      onLongPress: () {
-        // Long press untuk masuk mode seleksi
-        setState(() {
-          _isSelectionMode = true;
-          _selectedNims.add(nim);
-        });
-      },
-      onTap: _isSelectionMode
-          ? () {
-              setState(() {
-                if (isSelected) {
-                  _selectedNims.remove(nim);
-                  if (_selectedNims.isEmpty) _isSelectionMode = false;
-                } else {
-                  _selectedNims.add(nim);
-                }
-              });
-            }
-          : null,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 8),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? AppColors.primaryBlue.withOpacity(0.08)
-              : AppColors.surface,
-          borderRadius: BorderRadius.circular(10),
-          border: Border.all(
-            color: isSelected
-                ? AppColors.primaryBlue.withOpacity(0.4)
-                : AppColors.border,
-            width: isSelected ? 1.5 : 1,
-          ),
-        ),
-        child: Row(
-          children: [
-            // Checkbox (mode seleksi) atau avatar inisial (mode normal)
-            if (_isSelectionMode)
-              Padding(
-                padding: const EdgeInsets.only(right: 10),
-                child: Icon(
-                  isSelected
-                      ? Icons.check_box_rounded
-                      : Icons.check_box_outline_blank_rounded,
-                  color: isSelected
-                      ? AppColors.primaryBlue
-                      : AppColors.textSecondary,
-                  size: 22,
-                ),
-              )
-            else
-              Container(
-                width: 36,
-                height: 36,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: chipColor.withOpacity(0.15),
-                  shape: BoxShape.circle,
-                ),
-                child: Center(
-                  child: Text(
-                    nama.isNotEmpty ? nama[0].toUpperCase() : '?',
-                    style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: chipColor,
-                        fontSize: 15),
-                  ),
-                ),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppColors.surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: AppColors.border),
+      ),
+      child: Row(
+        children: [
+          // Avatar inisial
+          Container(
+            width: 36,
+            height: 36,
+            margin: const EdgeInsets.only(right: 10),
+            decoration: BoxDecoration(
+              color: chipColor.withOpacity(0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                nama.isNotEmpty ? nama[0].toUpperCase() : '?',
+                style: TextStyle(fontWeight: FontWeight.bold, color: chipColor, fontSize: 15),
               ),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            ),
+          ),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(nama, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13)),
+                Text(nim, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),
+              ],
+            ),
+          ),
+          // Chip status — tap untuk ubah status individual
+          GestureDetector(
+            onTap: () => _showStatusDialog(nim, nama, status),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                color: chipColor.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: chipColor.withOpacity(0.4)),
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(nama,
-                      style: const TextStyle(
-                          fontWeight: FontWeight.w600, fontSize: 13)),
-                  Text(nim,
-                      style: const TextStyle(
-                          color: AppColors.textSecondary, fontSize: 12)),
+                  Icon(chipIcon, size: 13, color: chipColor),
+                  const SizedBox(width: 4),
+                  Text(chipLabel,
+                      style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: chipColor)),
+                  const SizedBox(width: 4),
+                  Icon(Icons.edit_rounded, size: 11, color: chipColor.withOpacity(0.7)),
                 ],
               ),
             ),
-            // Chip status — tap untuk ubah (hanya saat bukan mode seleksi)
-            if (!_isSelectionMode)
-              GestureDetector(
-                onTap: () => _showStatusDialog(nim, nama, status),
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-                  decoration: BoxDecoration(
-                    color: chipColor.withOpacity(0.12),
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: chipColor.withOpacity(0.4)),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(chipIcon, size: 13, color: chipColor),
-                      const SizedBox(width: 4),
-                      Text(chipLabel,
-                          style: TextStyle(
-                              fontSize: 11,
-                              fontWeight: FontWeight.bold,
-                              color: chipColor)),
-                      const SizedBox(width: 4),
-                      Icon(Icons.edit_rounded,
-                          size: 11, color: chipColor.withOpacity(0.7)),
-                    ],
-                  ),
-                ),
-              )
-            else
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: chipColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(chipLabel,
-                    style: TextStyle(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: chipColor)),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

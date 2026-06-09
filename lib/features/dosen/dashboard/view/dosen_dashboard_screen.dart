@@ -298,40 +298,12 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   }
 
   Widget _buildStatistik() {
-    return Row(
-      children: [
-        Expanded(
-          child: ValueListenableBuilder<int>(
-            valueListenable: _vm.kehadiranSemester,
-            builder: (_, hadir, __) => ValueListenableBuilder<int>(
-              valueListenable: _vm.totalPertemuanSemester,
-              builder: (_, total, __) {
-                final pct = total > 0 ? hadir / total : 0.0;
-                final color = pct >= 0.8
-                    ? AppColors.success
-                    : pct >= 0.6
-                        ? AppColors.warning
-                        : total == 0
-                            ? AppColors.textSecondary
-                            : AppColors.error;
-                return _buildStatCard(
-                  'Hadir Semester',
-                  total == 0 ? '-' : '$hadir/$total',
-                  color,
-                );
-              },
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ValueListenableBuilder<int>(
-            valueListenable: _vm.izinPending,
-            builder: (_, pending, __) =>
-                _buildStatCard('Izin Pending', '$pending', AppColors.warning),
-          ),
-        ),
-      ],
+    return ValueListenableBuilder<int>(
+      valueListenable: _vm.izinPending,
+      builder: (_, pending, __) {
+        if (pending == 0) return const SizedBox.shrink();
+        return _buildStatCard('Izin Pending Tindak Lanjut', '$pending', AppColors.warning);
+      },
     );
   }
 

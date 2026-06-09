@@ -20,6 +20,10 @@ class SesiDosenViewModel {
   final ValueNotifier<List<Map<String, dynamic>>> statusMahasiswa = ValueNotifier([]);
   final TextEditingController materiController = TextEditingController();
 
+  // Kehadiran semester untuk jadwal ini (per mata kuliah)
+  final ValueNotifier<int> kehadiranHadir = ValueNotifier(0);
+  final ValueNotifier<int> kehadiranTotal = ValueNotifier(14);
+
   DateTime? _waktuMulai;
   DateTime? _waktuSelesai;
   LaporanDosen? _currentLaporan;
@@ -88,6 +92,25 @@ class SesiDosenViewModel {
         loadStatusMahasiswa();
         _startRefreshTimer();
       }
+    }
+
+    // Load kehadiran semester untuk jadwal ini
+    _loadKehadiranSemester();
+  }
+
+  Future<void> _loadKehadiranSemester() async {
+    try {
+      final semua = await DatabaseService().getKehadiranDosenSemester(dosenId);
+      final entry = semua.firstWhere(
+        (e) => e['jadwalId'] == jadwalId,
+        orElse: () => <String, dynamic>{},
+      );
+      if (entry.isNotEmpty) {
+        kehadiranHadir.value = entry['hadir'] as int? ?? 0;
+        kehadiranTotal.value = entry['total'] as int? ?? 14;
+      }
+    } catch (e) {
+      debugPrint('[SesiVM] kehadiran semester error: $e');
     }
   }
 
@@ -185,15 +208,14 @@ class SesiDosenViewModel {
 
   /// Tandai banyak mahasiswa sekaligus (bulk action)
   Future<void> tandaiStatusBulk(List<String> nimList, String status) async {
-    for (final nim in nimList) {
-      await DatabaseService().tandaiStatusMahasiswaByDosen(jadwalId, nim, status);
-    }
+    await DatabaseService().tandaiStatusMahasiswaByDosenBulk(jadwalId, nimList, status);
     await loadStatusMahasiswa();
   }
 
   /// Kirim push notification ke mahasiswa yang ter-enroll di jadwal ini.
   /// Best-effort: jika gagal, hanya log error, tidak mengganggu flow utama.
   Future<void> _trySendAbsensiNotification() async {
+    if (NotificationService.isTesting) return;
     try {
       final db = DatabaseService();
 

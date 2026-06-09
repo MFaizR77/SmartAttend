@@ -189,6 +189,7 @@ class NotificationService {
 
   /// Menjadwalkan pengingat harian pada jam tertentu (misal: 20:00)
   Future<void> scheduleDailyReminder() async {
+    if (isTesting) return;
     await requestPermission();
 
     const int notificationId = 100;
@@ -222,12 +223,21 @@ class NotificationService {
 
   /// Menghapus notifikasi pengingat jika dosen sudah mengisi laporan
   Future<void> cancelDailyReminder() async {
+    if (isTesting) return;
     await flutterLocalNotificationsPlugin.cancel(100);
   }
 
+  static bool isTesting = false;
+
   /// Jadwalkan notifikasi -5 menit sebelum jamMulai untuk setiap jadwal hari ini.
   Future<void> scheduleAbsensiReminder(List<Map<String, dynamic>> jadwalHariIni) async {
-    await requestPermission();
+    if (isTesting) return;
+    try {
+      await requestPermission();
+    } catch (e) {
+      debugPrint('Error request permission di test/background: $e');
+      return;
+    }
 
     final now = DateTime.now();
     final tanggal = '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
@@ -291,6 +301,7 @@ class NotificationService {
 
   /// Cek apakah ada laporan yang belum diisi, kalau ada schedule reminder jam 8 malam.
   Future<void> checkAndScheduleLaporanReminder(String dosenId) async {
+    if (isTesting) return;
     try {
       final db = DatabaseService();
 
