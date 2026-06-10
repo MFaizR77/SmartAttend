@@ -1,19 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/timezone.dart' as tz;
 import '../../../../core/theme/app_colors.dart';
 import '../../../../core/services/connectivity_service.dart';
-import '../../../../core/services/fcm_sender_service.dart';
-import '../../../../core/services/notification_service.dart';
 import '../../../../data/local/models/user.dart';
-import '../../../../data/remote/database_service.dart';
 import '../../dashboard/viewmodel/dosen_dashboard_viewmodel.dart';
 import '../../sesi/view/sesi_dosen_screen.dart';
 import '../../pergantian_jadwal/view/pergantian_jadwal_screen.dart';
+import '../../jadwal/view/jadwal_dosen_screen.dart';
 import '../../../profil/view/profil_screen.dart';
 import '../../rekap/view/rekap_dosen_screen.dart';
-import '../../izin/view/approval_dosen_screen.dart';
+import '../../approval/view/approval_screen.dart';
 import '../../izin/view/izin_dosen_screen.dart';
 
 class DosenDashboardScreen extends StatefulWidget {
@@ -90,122 +86,6 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
           child: _buildCurrentScreen(bottomInset),
         ),
         bottomNavigationBar: _buildBottomNav(bottomInset),
-        floatingActionButton: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.end,
-          children: [
-            // TEST: Kirim FCM ke mahasiswa
-            FloatingActionButton(
-              heroTag: 'fab_fcm',
-              onPressed: () async {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                scaffoldMessenger.showSnackBar(
-                  const SnackBar(content: Text('Mengirim test FCM...')),
-                );
-                try {
-                  final tokens = await DatabaseService().getFcmTokensByJadwal('D3_2B_25IF2122_Senin_0700_PR');
-                  print('[TEST] Tokens ditemukan: ${tokens.length}');
-                  if (tokens.isEmpty) {
-                    scaffoldMessenger.showSnackBar(
-                      const SnackBar(content: Text('Tidak ada token mahasiswa ditemukan')),
-                    );
-                    return;
-                  }
-                  final sent = await FCMSenderService().sendNotificationToTokens(
-                    tokens: tokens,
-                    title: 'Test Notifikasi',
-                    body: 'Ini test dari Faiz',
-                  );
-                  print('[TEST] Terkirim: $sent');
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Terkirim ke $sent device')),
-                  );
-                } catch (e) {
-                  print('[TEST] Error: $e');
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              },
-              backgroundColor: Colors.red,
-              child: const Icon(Icons.send, color: Colors.white),
-            ),
-            const SizedBox(height: 12),
-            // TEST: Schedule notifikasi absensi (1 menit dari sekarang)
-            FloatingActionButton(
-              heroTag: 'fab_absensi',
-              onPressed: () async {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                try {
-                  final now = DateTime.now().add(const Duration(minutes: 1));
-                  final jamMulai = '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
-                  final dummyJadwal = [
-                    {
-                      '_id': 'TEST_ABSENSI_${now.millisecondsSinceEpoch}',
-                      'namaMK': 'Test Absensi Reminder',
-                      'jamMulai': jamMulai,
-                      'jamSelesai': '${now.add(const Duration(hours: 1, minutes: -5)).hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}',
-                      'ruangan': 'Lab Test',
-                    },
-                  ];
-                  await NotificationService().scheduleAbsensiReminder(dummyJadwal);
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Absensi reminder dijadwalkan jam $jamMulai (1 menit lagi)')),
-                  );
-                } catch (e) {
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              },
-              backgroundColor: Colors.orange,
-              child: const Icon(Icons.access_alarm, color: Colors.white),
-            ),
-            const SizedBox(height: 12),
-            // TEST: Schedule notifikasi laporan (1 menit dari sekarang)
-            FloatingActionButton(
-              heroTag: 'fab_laporan',
-              onPressed: () async {
-                final scaffoldMessenger = ScaffoldMessenger.of(context);
-                try {
-                  final now = DateTime.now().add(const Duration(minutes: 1));
-                  await NotificationService().flutterLocalNotificationsPlugin.zonedSchedule(
-                    99999,
-                    'Test Reminder Laporan',
-                    'Jangan lupa mengisi laporan/materi untuk sesi perkuliahan Anda hari ini.',
-                    tz.TZDateTime(tz.local, now.year, now.month, now.day, now.hour, now.minute),
-                    const NotificationDetails(
-                      android: AndroidNotificationDetails(
-                        'daily_reminder_channel',
-                        'Daily Reminder',
-                        channelDescription: 'Pengingat harian untuk laporan dosen',
-                        importance: Importance.max,
-                        priority: Priority.high,
-                      ),
-                      iOS: DarwinNotificationDetails(
-                        presentAlert: true,
-                        presentBadge: true,
-                        presentSound: true,
-                      ),
-                    ),
-                    androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
-                    uiLocalNotificationDateInterpretation:
-                        UILocalNotificationDateInterpretation.absoluteTime,
-                  );
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Laporan reminder dijadwalkan jam ${now.hour}:${now.minute.toString().padLeft(2, '0')} (1 menit lagi)')),
-                  );
-                } catch (e) {
-                  scaffoldMessenger.showSnackBar(
-                    SnackBar(content: Text('Error: $e')),
-                  );
-                }
-              },
-              backgroundColor: Colors.blue,
-              child: const Icon(Icons.note_add, color: Colors.white),
-            ),
-          ],
-        ),
       ),
     );
   }
@@ -215,10 +95,12 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
       case 0:
         return _buildDashboardContent(bottomInset);
       case 1:
-        return RekapDosenScreen(user: widget.user);
+        return JadwalDosenScreen(user: widget.user);
       case 2:
-        return const ApprovalDosenScreen();
+        return RekapDosenScreen(user: widget.user);
       case 3:
+        return ApprovalScreen(user: widget.user);
+      case 4:
         return ProfilScreen(user: widget.user, onLogout: widget.onLogout);
       default:
         return _buildDashboardContent(bottomInset);
@@ -416,30 +298,12 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   }
 
   Widget _buildStatistik() {
-    return Row(
-      children: [
-        Expanded(
-          child: ValueListenableBuilder<int>(
-            valueListenable: _vm.mahasiswaHadir,
-            builder: (_, hadir, child) => ValueListenableBuilder<int>(
-              valueListenable: _vm.totalMahasiswa,
-              builder: (_, total, child) => _buildStatCard(
-                'Kehadiran',
-                '$hadir/$total',
-                AppColors.success,
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: ValueListenableBuilder<int>(
-            valueListenable: _vm.izinPending,
-            builder: (_, pending, child) =>
-                _buildStatCard('Izin Pending', '$pending', AppColors.warning),
-          ),
-        ),
-      ],
+    return ValueListenableBuilder<int>(
+      valueListenable: _vm.izinPending,
+      builder: (_, pending, __) {
+        if (pending == 0) return const SizedBox.shrink();
+        return _buildStatCard('Izin Pending Tindak Lanjut', '$pending', AppColors.warning);
+      },
     );
   }
 
@@ -723,6 +587,7 @@ class _DosenDashboardScreenState extends State<DosenDashboardScreen> {
   Widget _buildBottomNav(double bottomInset) {
     final items = [
       {'icon': Icons.home_outlined, 'label': 'Dashboard'},
+      {'icon': Icons.calendar_month_outlined, 'label': 'Jadwal'},
       {'icon': Icons.bar_chart, 'label': 'Rekap'},
       {'icon': Icons.fact_check_outlined, 'label': 'Approval'},
       {'icon': Icons.account_circle_outlined, 'label': 'Profil'},

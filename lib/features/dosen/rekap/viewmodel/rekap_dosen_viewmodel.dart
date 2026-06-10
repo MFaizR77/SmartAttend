@@ -32,7 +32,7 @@ class RekapDosenViewModel extends ChangeNotifier {
       // Dari kode sebelumnya, laporan_dosen mungkin menyimpan jadwalId. 
       // Untuk tampilan, kita butuh informasi kelas & matkul. 
       // Kita fetch juga seluruh jadwal dosen ini untuk mapping.
-      final seluruhJadwal = await _db.getJadwalDosen(dosen.id);
+      final seluruhJadwal = await _db.getAllJadwalDosen(dosen.id);
       final Map<String, Map<String, dynamic>> mapJadwal = {};
       for (var j in seluruhJadwal) {
         mapJadwal[j['_id'].toString()] = j;

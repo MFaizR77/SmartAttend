@@ -720,6 +720,86 @@ class DatabaseService {
     }
   }
 
+  /// Bulk action untuk menandai banyak mahasiswa sekaligus secara efisien.
+  /// Menghindari timeout / rate limit dari eksekusi sequential.
+  Future<void> tandaiStatusMahasiswaByDosenBulk(String jadwalId, List<String> mahasiswaIds, String status) async {
+    if (mahasiswaIds.isEmpty) return;
+
+    await connect();
+    final coll = _requireDb.collection('record_presensi');
+    final now = DateTime.now();
+    final start = DateTime(now.year, now.month, now.day);
+    final end = DateTime(now.year, now.month, now.day, 23, 59, 59);
+
+    // 1. Ambil semua record untuk mahasiswa yang direquest hari ini
+    final allToday = await coll.find({
+      'sesiId': jadwalId,
+      'mahasiswaId': {r'$in': mahasiswaIds},
+    }).toList();
+
+    // Pisahkan mana yang butuh update dan mana yang butuh insert
+    final Set<String> foundMahasiswaIds = {};
+    final List<dynamic> existingIdsToUpdate = [];
+    final List<dynamic> existingIdsToDelete = [];
+
+    for (final r in allToday) {
+      final ts = r['timestamp'];
+      DateTime? tsDate;
+      if (ts is DateTime) {
+        tsDate = ts;
+      } else if (ts is String) {
+        tsDate = DateTime.tryParse(ts);
+      }
+
+      if (tsDate != null && !tsDate.isBefore(start) && !tsDate.isAfter(end)) {
+        final mId = r['mahasiswaId']?.toString() ?? '';
+        foundMahasiswaIds.add(mId);
+
+        if (status == 'hapus') {
+          if (r['markedByDosen'] == true) {
+            existingIdsToDelete.add(r['_id']);
+          }
+        } else {
+          existingIdsToUpdate.add(r['_id']);
+        }
+      }
+    }
+
+    // 2. Eksekusi Update atau Delete (Bulk)
+    if (status == 'hapus') {
+      if (existingIdsToDelete.isNotEmpty) {
+        await coll.deleteMany({'_id': {r'$in': existingIdsToDelete}});
+      }
+    } else {
+      if (existingIdsToUpdate.isNotEmpty) {
+        await coll.updateMany(
+          {'_id': {r'$in': existingIdsToUpdate}},
+          {r'$set': {'status': status, 'markedByDosen': true, 'updatedAt': now}},
+        );
+      }
+
+      // 3. Insert untuk mahasiswa yang belum punya record hari ini
+      final List<Map<String, dynamic>> newRecords = [];
+      for (final mId in mahasiswaIds) {
+        if (!foundMahasiswaIds.contains(mId)) {
+          newRecords.add({
+            '_id': ObjectId(),
+            'sesiId': jadwalId,
+            'mahasiswaId': mId,
+            'status': status,
+            'timestamp': now,
+            'createdAt': now,
+            'markedByDosen': true,
+          });
+        }
+      }
+
+      if (newRecords.isNotEmpty) {
+        await coll.insertMany(newRecords);
+      }
+    }
+  }
+
   Future<void> insertRecordPresensi(Map<String, dynamic> record) async {
     await connect();
     final coll = _requireDb.collection('record_presensi');
@@ -796,6 +876,62 @@ class DatabaseService {
   Future<List<Map<String, dynamic>>> getAllLaporanDosen(String dosenId) async {
     await connect();
     return _requireDb.collection('laporan_dosen').find({'dosenId': dosenId}).toList();
+  }
+
+  /// Hitung kehadiran dosen per semester secara breakdown per matakuliah/jadwal.
+  /// - hadir: jumlah laporan_dosen untuk jadwal tersebut yg punya materi (dosen sudah isi laporan)
+  /// - total: default 16 pertemuan per mata kuliah
+  Future<List<Map<String, dynamic>>> getKehadiranDosenSemester(String dosenId) async {
+    await connect();
+
+    // Ambil periode aktif
+    final periode = await _requireDb.collection('periode_akademik').findOne({'isAktif': true});
+    final periodeKode = periode?['kode']?.toString() ?? '';
+
+    // Ambil semua jadwal dosen di periode ini
+    final selectorJadwal = <String, dynamic>{
+      r'$or': [
+        {'kodeDosen': dosenId},
+        {'dosenId': dosenId},
+        {'dosenIds': dosenId},
+      ],
+      if (periodeKode.isNotEmpty) 'periodeAkademikKode': periodeKode,
+    };
+    final jadwalList = await _requireDb.collection('jadwal_kuliah').find(selectorJadwal).toList();
+
+    // Ambil semua laporan dosen
+    final semuaLaporan = await _requireDb
+        .collection('laporan_dosen')
+        .find({'dosenId': dosenId}).toList();
+
+    // Hitung kehadiran per jadwalId (hanya jika dosen sudah isi laporan materi)
+    final Map<String, int> hadirPerJadwal = {};
+    for (final lap in semuaLaporan) {
+      final materi = lap['materi']?.toString().trim() ?? '';
+      if (materi.isNotEmpty) {
+        final jId = lap['jadwalId']?.toString() ?? '';
+        if (jId.isNotEmpty) {
+          hadirPerJadwal[jId] = (hadirPerJadwal[jId] ?? 0) + 1;
+        }
+      }
+    }
+
+    final List<Map<String, dynamic>> result = [];
+    for (final j in jadwalList) {
+      final jId = j['_id'].toString();
+      final hadir = hadirPerJadwal[jId] ?? 0;
+      final total = j['totalPertemuan'] as int? ?? 16;
+
+      result.add({
+        'jadwalId': jId,
+        'mataKuliah': j['namaMK'] ?? j['mataKuliah'] ?? 'Mata Kuliah',
+        'kelas': j['kelas'] ?? '-',
+        'hadir': hadir,
+        'total': total,
+      });
+    }
+
+    return result;
   }
 
   Future<bool> isKelasBerjalan(String jadwalId) async {

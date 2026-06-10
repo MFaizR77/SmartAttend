@@ -20,6 +20,9 @@ class SesiDosenScreen extends StatefulWidget {
 class _SesiDosenScreenState extends State<SesiDosenScreen> {
   late SesiDosenViewModel _vm;
 
+  // Loading state untuk tandai semua hadir
+  bool _isTandaiSemuaLoading = false;
+
   @override
   void initState() {
     super.initState();
@@ -97,9 +100,49 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                     children: [
                       Text(widget.jadwal['mataKuliah'] ?? '-', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 4),
-                      Text('Ruang: ${widget.jadwal["ruang"]}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                      Row(
+                        children: [
+                          Icon(Icons.room_rounded, size: 14, color: AppColors.textSecondary),
+                          const SizedBox(width: 4),
+                          Text('Ruang: ${widget.jadwal["ruang"]}', style: const TextStyle(fontSize: 13, color: AppColors.textSecondary)),
+                        ],
+                      ),
                     ],
                   ),
+                ),
+                // Chip Kehadiran Semester Dosen
+                ValueListenableBuilder<int>(
+                  valueListenable: _vm.kehadiranHadir,
+                  builder: (context, hadir, child) {
+                    return ValueListenableBuilder<int>(
+                      valueListenable: _vm.kehadiranTotal,
+                      builder: (context, total, child) {
+                        if (total == 0) return const SizedBox.shrink(); // Hide if data not loaded
+                        return Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(
+                            color: AppColors.primaryBlue.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: AppColors.primaryBlue.withOpacity(0.3)),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.end,
+                            children: [
+                              Text(
+                                'Hadir Semester',
+                                style: TextStyle(fontSize: 10, color: AppColors.primaryBlue.withOpacity(0.8), fontWeight: FontWeight.w600),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                '$hadir / $total',
+                                style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: AppColors.primaryBlue),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    );
+                  },
                 ),
               ],
             ),
@@ -312,12 +355,19 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
         return ValueListenableBuilder<List<Map<String, dynamic>>>(
           valueListenable: _vm.statusMahasiswa,
           builder: (context, list, _) {
-            // Hitung ringkasan
             final hadirCount = list.where((m) => m['status'] == 'hadir').length;
             final belumCount = list.where((m) => m['status'] == 'belum').length;
             final alphaCount = list.where((m) => m['status'] == 'alpha').length;
             final izinCount  = list.where((m) => m['status'] == 'izin').length;
             final sakitCount = list.where((m) => m['status'] == 'sakit').length;
+
+            // Mahasiswa yang statusnya belum/alpha (layak ditandai hadir)
+            final nimsBelumHadir = list
+                .where((m) => m['status'] == 'belum' || m['status'] == 'alpha')
+                .map((m) => m['nim'] as String? ?? '')
+                .where((n) => n.isNotEmpty)
+                .toList();
+            final semuaSudahHadir = nimsBelumHadir.isEmpty && list.isNotEmpty;
 
             return Card(
               elevation: 0,
@@ -340,7 +390,6 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                           child: Text('Kehadiran Mahasiswa',
                               style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: AppColors.primary)),
                         ),
-                        // Refresh manual
                         InkWell(
                           onTap: () => _vm.loadStatusMahasiswa(),
                           borderRadius: BorderRadius.circular(8),
@@ -353,7 +402,7 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                     ),
                     const SizedBox(height: 12),
 
-                    // Ringkasan chip
+                    // Summary chips
                     if (list.isNotEmpty)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
@@ -371,6 +420,67 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                           ],
                         ),
                       ),
+
+                    // Tombol Tandai Semua Hadir
+                    if (list.isNotEmpty) ...[
+                      const SizedBox(height: 10),
+                      semuaSudahHadir
+                          ? Container(
+                              width: double.infinity,
+                              padding: const EdgeInsets.symmetric(vertical: 10),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.08),
+                                borderRadius: BorderRadius.circular(10),
+                                border: Border.all(color: AppColors.success.withOpacity(0.3)),
+                              ),
+                              child: const Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(Icons.check_circle_rounded, color: AppColors.success, size: 16),
+                                  SizedBox(width: 6),
+                                  Text('Semua mahasiswa sudah hadir',
+                                      style: TextStyle(color: AppColors.success, fontWeight: FontWeight.w600, fontSize: 13)),
+                                ],
+                              ),
+                            )
+                          : GestureDetector(
+                              onTap: _isTandaiSemuaLoading ? null : () => _tandaiSemuaHadir(nimsBelumHadir),
+                              child: Container(
+                                width: double.infinity,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                decoration: BoxDecoration(
+                                  color: AppColors.primaryBlue.withOpacity(0.07),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: Border.all(color: AppColors.primaryBlue.withOpacity(0.35)),
+                                ),
+                                child: _isTandaiSemuaLoading
+                                    ? const Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          SizedBox(
+                                            width: 14, height: 14,
+                                            child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.primaryBlue),
+                                          ),
+                                          SizedBox(width: 8),
+                                          Text('Menandai semua hadir...',
+                                              style: TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w600, fontSize: 13)),
+                                        ],
+                                      )
+                                    : Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          const Icon(Icons.done_all_rounded, color: AppColors.primaryBlue, size: 16),
+                                          const SizedBox(width: 6),
+                                          Text(
+                                            'Tandai Semua Hadir (${nimsBelumHadir.length})',
+                                            style: const TextStyle(color: AppColors.primaryBlue, fontWeight: FontWeight.w700, fontSize: 13),
+                                          ),
+                                        ],
+                                      ),
+                              ),
+                            ),
+                    ],
+
                     const SizedBox(height: 12),
 
                     // Daftar mahasiswa
@@ -394,13 +504,39 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
     );
   }
 
+  Future<void> _tandaiSemuaHadir(List<String> nims) async {
+    if (nims.isEmpty) return;
+    setState(() => _isTandaiSemuaLoading = true);
+    try {
+      await _vm.tandaiStatusBulk(nims, 'hadir');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+          content: Text('${nims.length} mahasiswa ditandai Hadir'),
+          backgroundColor: AppColors.success,
+          behavior: SnackBarBehavior.floating,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          margin: const EdgeInsets.all(16),
+        ));
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Gagal menandai hadir, coba lagi'),
+          backgroundColor: AppColors.error,
+        ));
+      }
+    } finally {
+      if (mounted) setState(() => _isTandaiSemuaLoading = false);
+    }
+  }
+
   Widget _summaryChip(String label, int count, Color color) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
+        border: Border.all(color: color.withOpacity(0.3)),
       ),
       child: Text(
         '$label: $count',
@@ -438,7 +574,7 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
         chipLabel = 'Alpha';
         chipIcon = Icons.cancel_rounded;
         break;
-      default: // 'belum'
+      default:
         chipColor = Colors.grey;
         chipLabel = 'Belum Absen';
         chipIcon = Icons.access_time_rounded;
@@ -454,12 +590,13 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
       ),
       child: Row(
         children: [
-          // Inisial avatar
+          // Avatar inisial
           Container(
             width: 36,
             height: 36,
+            margin: const EdgeInsets.only(right: 10),
             decoration: BoxDecoration(
-              color: chipColor.withValues(alpha: 0.15),
+              color: chipColor.withOpacity(0.15),
               shape: BoxShape.circle,
             ),
             child: Center(
@@ -469,7 +606,6 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
               ),
             ),
           ),
-          const SizedBox(width: 10),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -479,15 +615,15 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
               ],
             ),
           ),
-          // Chip status — semua bisa di-tap untuk ubah status
+          // Chip status — tap untuk ubah status individual
           GestureDetector(
             onTap: () => _showStatusDialog(nim, nama, status),
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
               decoration: BoxDecoration(
-                color: chipColor.withValues(alpha: 0.12),
+                color: chipColor.withOpacity(0.12),
                 borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: chipColor.withValues(alpha: 0.4)),
+                border: Border.all(color: chipColor.withOpacity(0.4)),
               ),
               child: Row(
                 mainAxisSize: MainAxisSize.min,
@@ -497,7 +633,7 @@ class _SesiDosenScreenState extends State<SesiDosenScreen> {
                   Text(chipLabel,
                       style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: chipColor)),
                   const SizedBox(width: 4),
-                  Icon(Icons.edit_rounded, size: 11, color: chipColor.withValues(alpha: 0.7)),
+                  Icon(Icons.edit_rounded, size: 11, color: chipColor.withOpacity(0.7)),
                 ],
               ),
             ),

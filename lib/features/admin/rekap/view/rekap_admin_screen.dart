@@ -564,9 +564,6 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
 
     final totalHadir = _vm.daftarRekap.fold<int>(0, (s, r) => s + (r['hadir'] as int? ?? 0));
     final totalBerhalangan = _vm.daftarRekap.fold<int>(0, (s, r) => s + (r['berhalangan'] as int? ?? 0));
-    final avgPersen = _vm.daftarRekap.isNotEmpty
-        ? _vm.daftarRekap.fold<double>(0, (s, r) => s + (r['persenHadir'] as double? ?? 0.0)) / _vm.daftarRekap.length
-        : 0.0;
 
     return ListView(
       padding: const EdgeInsets.fromLTRB(12, 0, 12, 24),
@@ -588,8 +585,6 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
               _statPill('Hadir', totalHadir.toString(), AppColors.primaryBlue),
               const SizedBox(width: 8),
               _statPill('Berhalangan', totalBerhalangan.toString(), const Color(0xFFB45309)),
-              const SizedBox(width: 8),
-              _statPill('Avg %', '${avgPersen.toStringAsFixed(1)}%', const Color(0xFF0F766E)),
             ],
           ),
         ),
@@ -600,17 +595,11 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
           final hadir = d['hadir'] as int? ?? 0;
           final berhalangan = d['berhalangan'] as int? ?? 0;
           final totalPertemuan = d['totalPertemuan'] as int? ?? 0;
-          final persen = d['persenHadir'] as double? ?? 0.0;
           final tanggalHadir = (d['tanggalHadir'] as List?)?.cast<String>() ?? [];
           final berhalanganDetail = (d['berhalanganDetail'] as List?)
                   ?.map((e) => Map<String, dynamic>.from(e as Map))
                   .toList() ??
               [];
-          final persenColor = persen >= 75
-              ? AppColors.primaryBlue
-              : persen >= 50
-                  ? const Color(0xFFB45309)
-                  : const Color(0xFFDC2626);
 
           return Padding(
             padding: const EdgeInsets.only(bottom: 8),
@@ -624,19 +613,9 @@ class _RekapAdminScreenState extends State<RekapAdminScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          d['nama']?.toString() ?? '-',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
-                        ),
-                      ),
-                      Text(
-                        '${persen.toStringAsFixed(1)}%',
-                        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w800, color: persenColor),
-                      ),
-                    ],
+                  Text(
+                    d['nama']?.toString() ?? '-',
+                    style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w800),
                   ),
                   const SizedBox(height: 4),
                   Text(
