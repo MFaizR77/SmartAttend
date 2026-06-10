@@ -71,6 +71,7 @@ class IzinViewModel {
     required String keterangan,
     String? fotoPath,
     String? fotoUrl,
+    String? fotoBase64,
     List<String>? selectedJadwalIds,
   }) async {
     isLoading.value = true;
@@ -179,6 +180,8 @@ class IzinViewModel {
           'jadwalIdsTerdampak': jadwalIds,
           'tindakLanjutDosen': tindakLanjut,
           'cakupan': cakupan,
+          if (fotoBase64 != null && fotoBase64.isNotEmpty)
+            'fotoBase64': fotoBase64,
         },
       );
 
@@ -202,6 +205,8 @@ class IzinViewModel {
             'keterangan': keterangan,
             'fotoPath': fotoPath,
             'fotoUrl': fotoUrl,
+            if (fotoBase64 != null && fotoBase64.isNotEmpty)
+              'fotoBase64': fotoBase64,
             'jadwalIdsTerdampak': jadwalIds,
             'tindakLanjutDosen': tindakLanjut,
             'cakupan': cakupan,
@@ -268,6 +273,7 @@ class IzinViewModel {
           'jadwalIdsTerdampak': extraMap['jadwalIdsTerdampak'] ?? const [],
           'tindakLanjutDosen': extraMap['tindakLanjutDosen'] ?? const [],
           'cakupan': extraMap['cakupan'],
+          'fotoBase64': extraMap['fotoBase64'],
           'status': i.statusApproval == 'pending'
               ? 'pending_wali'
               : i.statusApproval,

@@ -1,6 +1,11 @@
+import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
+import '../../../../core/utils/image_helper.dart';
 import '../../../../data/local/models/user.dart';
 import '../viewmodel/izin_viewmodel.dart';
 
@@ -27,6 +32,12 @@ class _IzinScreenState extends State<IzinScreen>
   /// Jadwal yang dipilih untuk diizinkan. Default: semua jadwal di tanggal
   /// terpilih (izin penuh). Mahasiswa bisa uncheck untuk izin sebagian.
   final Set<String> _selectedJadwalIds = {};
+
+  /// Foto bukti (base64) yang akan dikirim ke server. Null = belum pilih.
+  String? _fotoBase64;
+  String? _fotoLocalPath;
+  int _fotoSize = 0;
+  bool _isPickingFoto = false;
 
   @override
   void initState() {
@@ -110,6 +121,8 @@ class _IzinScreenState extends State<IzinScreen>
       jenis: _jenis,
       keterangan: _keteranganCtrl.text.trim(),
       selectedJadwalIds: _selectedJadwalIds.toList(),
+      fotoBase64: _fotoBase64,
+      fotoPath: _fotoLocalPath,
     );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
@@ -123,9 +136,52 @@ class _IzinScreenState extends State<IzinScreen>
     );
     if (ok) {
       _keteranganCtrl.clear();
+      setState(() {
+        _fotoBase64 = null;
+        _fotoLocalPath = null;
+        _fotoSize = 0;
+      });
       _tabCtrl.animateTo(1);
       await _vm.loadRiwayat(widget.user);
     }
+  }
+
+  Future<void> _pickFoto() async {
+    if (_isPickingFoto) return;
+    setState(() => _isPickingFoto = true);
+    try {
+      final picked = await ImageHelper.pickAndCompress();
+      if (!mounted) return;
+      if (picked != null) {
+        setState(() {
+          _fotoBase64 = picked.base64;
+          _fotoLocalPath = picked.localPath;
+          _fotoSize = picked.sizeBytes;
+        });
+        // Warning kalau foto kebesaran (>500KB base64).
+        if (picked.sizeBytes > 500 * 1024) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                'Foto agak besar (${(picked.sizeBytes / 1024).toStringAsFixed(0)} KB). '
+                'Sebaiknya pilih foto dengan resolusi lebih kecil.',
+              ),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+      }
+    } finally {
+      if (mounted) setState(() => _isPickingFoto = false);
+    }
+  }
+
+  void _removeFoto() {
+    setState(() {
+      _fotoBase64 = null;
+      _fotoLocalPath = null;
+      _fotoSize = 0;
+    });
   }
 
   @override
@@ -377,6 +433,11 @@ class _IzinScreenState extends State<IzinScreen>
           ),
 
           const SizedBox(height: 24),
+          _buildSectionTitle('Foto Bukti (Opsional)'),
+          const SizedBox(height: 10),
+          _buildFotoPicker(),
+
+          const SizedBox(height: 24),
           _buildSectionTitle('Jadwal Berdampak'),
           const SizedBox(height: 6),
           ValueListenableBuilder<List<Map<String, dynamic>>>(
@@ -599,6 +660,136 @@ class _IzinScreenState extends State<IzinScreen>
     );
   }
 
+  Widget _buildFotoPicker() {
+    if (_fotoLocalPath != null) {
+      // Preview thumbnail + tombol ganti/hapus.
+      return Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: const Color(0xFFE5E7EB)),
+        ),
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(10),
+              child: Image.file(
+                File(_fotoLocalPath!),
+                width: double.infinity,
+                height: 180,
+                fit: BoxFit.cover,
+                errorBuilder: (_, __, ___) {
+                  // Fallback ke base64 kalau path lokal tidak bisa diakses
+                  // (mis. file picker temp dihapus, app restart).
+                  if (_fotoBase64 != null) {
+                    return Image.memory(
+                      base64Decode(_fotoBase64!),
+                      width: double.infinity,
+                      height: 180,
+                      fit: BoxFit.cover,
+                    );
+                  }
+                  return Container(
+                    height: 180,
+                    color: const Color(0xFFF3F4F6),
+                    child: const Center(
+                      child: Icon(Icons.broken_image, size: 32),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    'Ukuran: ${(_fotoSize / 1024).toStringAsFixed(0)} KB',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF6B7280),
+                      fontFamily: 'Plus Jakarta Sans',
+                    ),
+                  ),
+                ),
+                TextButton.icon(
+                  onPressed: _isPickingFoto ? null : _pickFoto,
+                  icon: const Icon(Icons.swap_horiz_rounded, size: 16),
+                  label: const Text('Ganti', style: TextStyle(fontSize: 12)),
+                ),
+                TextButton.icon(
+                  onPressed: _removeFoto,
+                  icon: const Icon(Icons.delete_outline,
+                      size: 16, color: Colors.red),
+                  label: const Text('Hapus',
+                      style: TextStyle(fontSize: 12, color: Colors.red)),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    // Belum ada foto: tombol pick.
+    return InkWell(
+      onTap: _isPickingFoto ? null : _pickFoto,
+      borderRadius: BorderRadius.circular(14),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(vertical: 22, horizontal: 16),
+        decoration: BoxDecoration(
+          color: const Color(0xFFFAFAFA),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(
+            color: const Color(0xFF1E3A8A).withOpacity(0.15),
+            width: 1.5,
+          ),
+        ),
+        child: Column(
+          children: [
+            _isPickingFoto
+                ? const SizedBox(
+                    width: 28,
+                    height: 28,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2.5,
+                      valueColor:
+                          AlwaysStoppedAnimation<Color>(Color(0xFF1E3A8A)),
+                    ),
+                  )
+                : const Icon(
+                    Icons.add_photo_alternate_outlined,
+                    size: 36,
+                    color: Color(0xFF1E3A8A),
+                  ),
+            const SizedBox(height: 10),
+            Text(
+              _isPickingFoto ? 'Memproses foto…' : 'Tambah foto bukti',
+              style: const TextStyle(
+                fontSize: 13.5,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1E3A8A),
+                fontFamily: 'Plus Jakarta Sans',
+              ),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Foto akan dikompres otomatis. Maks ~500 KB.',
+              style: TextStyle(
+                fontSize: 11,
+                color: Color(0xFF9CA3AF),
+                fontFamily: 'Plus Jakarta Sans',
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _buildJadwalTerdampakCard(Map<String, dynamic> j) {
     final id = j['_id']?.toString() ?? '';
     final namaMK = j['namaMK']?.toString() ?? '-';
@@ -773,6 +964,101 @@ class _IzinScreenState extends State<IzinScreen>
                   fontSize: 10.50,
                   fontFamily: 'Plus Jakarta Sans',
                   fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Preview foto bukti di riwayat card. Tampilkan tile kompak; tap untuk
+  /// fullscreen viewer. Kalau dokumen tidak punya `fotoBase64`, return empty.
+  Widget _buildFotoPreviewRiwayat(Map<String, dynamic> izin) {
+    final raw = izin['fotoBase64']?.toString();
+    if (raw == null || raw.isEmpty) return const SizedBox.shrink();
+    Uint8List bytes;
+    try {
+      bytes = base64Decode(raw);
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: GestureDetector(
+        onTap: () => _showFotoFullscreen(bytes),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(10),
+          child: Stack(
+            children: [
+              Image.memory(
+                bytes,
+                width: double.infinity,
+                height: 140,
+                fit: BoxFit.cover,
+              ),
+              Positioned(
+                right: 8,
+                bottom: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 4,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.zoom_in, size: 12, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text(
+                        'Lihat',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// Buka foto dalam dialog fullscreen dengan pinch-zoom.
+  void _showFotoFullscreen(Uint8List bytes) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(8),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                style: IconButton.styleFrom(
+                  backgroundColor: Colors.black54,
                 ),
               ),
             ),
@@ -1166,6 +1452,7 @@ class _IzinScreenState extends State<IzinScreen>
               overflow: TextOverflow.ellipsis,
             ),
           ),
+          _buildFotoPreviewRiwayat(izin),
           if (izin['catatanWali'] != null &&
               izin['catatanWali'].toString().isNotEmpty) ...[
             const SizedBox(height: 10),

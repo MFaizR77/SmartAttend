@@ -175,6 +175,9 @@ class SyncManager {
             'tindakLanjutDosen':
                 (extra['tindakLanjutDosen'] as List?) ?? const [],
             'cakupan': extra['cakupan'],
+            if (extra['fotoBase64'] is String &&
+                (extra['fotoBase64'] as String).isNotEmpty)
+              'fotoBase64': extra['fotoBase64'],
             'status': 'pending_wali',
           };
 

@@ -1,3 +1,6 @@
+import 'dart:convert';
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/theme/app_colors.dart';
@@ -224,6 +227,7 @@ class _TindakLanjutIzinScreenState extends State<TindakLanjutIzinScreen> {
                 style: const TextStyle(fontSize: 13),
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis),
+            _buildFotoBuktiThumbnail(izin),
             const Divider(height: 24),
             Text(
                 cakupan == 'sebagian'
@@ -232,6 +236,97 @@ class _TindakLanjutIzinScreenState extends State<TindakLanjutIzinScreen> {
                 style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             ...myTindak.map((t) => _tindakTile(izin, t)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// Thumbnail foto bukti yang tap-able. Return empty kalau tidak ada foto.
+  Widget _buildFotoBuktiThumbnail(Map<String, dynamic> izin) {
+    final raw = izin['fotoBase64']?.toString();
+    if (raw == null || raw.isEmpty) return const SizedBox.shrink();
+    Uint8List bytes;
+    try {
+      bytes = base64Decode(raw);
+    } catch (_) {
+      return const SizedBox.shrink();
+    }
+    return Padding(
+      padding: const EdgeInsets.only(top: 10),
+      child: GestureDetector(
+        onTap: () => _showFotoFullscreen(bytes),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Stack(
+            children: [
+              Image.memory(
+                bytes,
+                width: double.infinity,
+                height: 140,
+                fit: BoxFit.cover,
+              ),
+              Positioned(
+                left: 8,
+                top: 8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Icons.image, size: 12, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text(
+                        'Foto Bukti — Tap untuk perbesar',
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: Colors.white,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _showFotoFullscreen(Uint8List bytes) {
+    showDialog(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: const EdgeInsets.all(8),
+        child: Stack(
+          children: [
+            Center(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Image.memory(bytes, fit: BoxFit.contain),
+              ),
+            ),
+            Positioned(
+              top: 8,
+              right: 8,
+              child: IconButton(
+                onPressed: () => Navigator.pop(ctx),
+                icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                style: IconButton.styleFrom(backgroundColor: Colors.black54),
+              ),
+            ),
           ],
         ),
       ),

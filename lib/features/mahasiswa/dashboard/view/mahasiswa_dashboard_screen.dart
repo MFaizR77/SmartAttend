@@ -6,7 +6,7 @@ import '../../../../data/local/models/user.dart';
 import '../../dashboard/viewmodel/mahasiswa_dashboard_viewmodel.dart';
 import '../../presensi/view/absensi_list_screen.dart';
 import '../../jadwal/view/jadwal_screen.dart';
-import '../../rekap/view/rekap_screen.dart';
+import '../../izin/view/izin_screen.dart';
 import '../../../profil/view/profil_screen.dart';
 import 'dart:async';
 import '../../../../data/remote/database_service.dart';
@@ -618,7 +618,6 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
       {'icon': Icons.person_outline_rounded, 'label': 'Presensi'},
       {'icon': Icons.calendar_today_outlined, 'label': 'Jadwal'},
       {'icon': Icons.shield_outlined, 'label': 'Izin/Sakit'},
-      {'icon': Icons.bar_chart, 'label': 'Rekap'},
     ];
 
     return Row(
@@ -633,17 +632,11 @@ class _MahasiswaDashboardScreenState extends State<MahasiswaDashboardScreen> {
                     setState(() => _currentNavIndex = 1);
                   } else if (menu['label'] == 'Presensi') {
                     setState(() => _currentNavIndex = 2);
-                  } else if (menu['label'] == 'Rekap') {
+                  } else if (menu['label'] == 'Izin/Sakit') {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => Scaffold(
-                          backgroundColor: const Color(0xFFF6F6F6),
-                          body: SafeArea(
-                            bottom: false,
-                            child: RekapScreen(user: widget.user),
-                          ),
-                        ),
+                        builder: (_) => IzinScreen(user: widget.user),
                       ),
                     );
                   } else {
